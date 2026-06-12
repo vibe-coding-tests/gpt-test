@@ -1,0 +1,19 @@
+{
+  "name": "pokekart",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "PokéKart — a Mario Kart-style browser racer with the original 151 Pokémon",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}
