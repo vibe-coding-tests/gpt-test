@@ -1,13 +1,14 @@
 import Phaser from "phaser";
-import type { Mode7View } from "./Mode7";
+import type { ThreeView } from "./ThreeView";
 
 /**
- * All helpers take WORLD coordinates. If the scene has an active Mode 7 view,
- * the effect is spawned in screen space at the projected point (short-lived
- * tweens run there without per-frame reprojection).
+ * All helpers take WORLD coordinates. In the 3D view, bursts / rings / bolts
+ * become real 3D particles in the world; floating text projects to screen
+ * space (crisp UI text doesn't belong in-scene). Top-down views draw plain
+ * Phaser objects at world coords like always.
  */
-function viewOf(scene: Phaser.Scene): Mode7View | undefined {
-  const v = (scene as Phaser.Scene & { view?: Mode7View }).view;
+function viewOf(scene: Phaser.Scene): ThreeView | undefined {
+  const v = (scene as Phaser.Scene & { view?: ThreeView }).view;
   return v && v.isM7 ? v : undefined;
 }
 
@@ -20,24 +21,29 @@ function place(scene: Phaser.Scene, x: number, y: number, depth: number) {
   return { x: p.x, y: p.y, k: p.persp * v.SPRITE, depth: 5000 + depth };
 }
 
-/** Radial burst of tinted particles (pooled-free, tween based). */
+/** Radial burst of tinted particles (3D sprites in-world, tweens top-down). */
 export function burst(
   scene: Phaser.Scene, x: number, y: number,
   opts: { color?: number; n?: number; spd?: number; life?: number; size?: number; depth?: number; tex?: string } = {}
 ) {
   const { color = 0xffffff, n = 8, spd = 90, life = 380, size = 5, depth = 8, tex = "fx-px" } = opts;
+  const v = viewOf(scene);
+  if (v) {
+    v.burst3d(x, y, { color, n, spd, life, size });
+    return;
+  }
   const at = place(scene, x, y, depth);
   if (!at) return;
   for (let i = 0; i < n; i++) {
     const a = Math.random() * Math.PI * 2;
-    const v = spd * (0.4 + Math.random() * 0.8) * at.k;
+    const sp = spd * (0.4 + Math.random() * 0.8) * at.k;
     const img = scene.add.image(at.x, at.y, tex)
       .setTint(color).setDepth(at.depth)
       .setDisplaySize(size * at.k, size * at.k).setAlpha(0.95);
     scene.tweens.add({
       targets: img,
-      x: at.x + Math.cos(a) * v * (life / 1000),
-      y: at.y + Math.sin(a) * v * (life / 1000),
+      x: at.x + Math.cos(a) * sp * (life / 1000),
+      y: at.y + Math.sin(a) * sp * (life / 1000),
       alpha: 0,
       scale: img.scale * 0.3,
       duration: life * (0.7 + Math.random() * 0.6),
@@ -47,6 +53,11 @@ export function burst(
 }
 
 export function ringPulse(scene: Phaser.Scene, x: number, y: number, color: number, radius = 60, depth = 8) {
+  const v = viewOf(scene);
+  if (v) {
+    v.ring3d(x, y, color, radius);
+    return;
+  }
   const at = place(scene, x, y, depth);
   if (!at) return;
   const ring = scene.add.image(at.x, at.y, "fx-ring").setTint(color).setDepth(at.depth).setScale(0.2 * at.k).setAlpha(0.9);
@@ -83,6 +94,11 @@ export function floatText(
 
 /** Quick lightning bolt strike down onto a world point. */
 export function boltStrike(scene: Phaser.Scene, x: number, y: number, depth = 9) {
+  const v = viewOf(scene);
+  if (v) {
+    v.bolt3d(x, y);
+    return;
+  }
   const at = place(scene, x, y, depth);
   if (!at) return;
   const k = at.k;
@@ -105,8 +121,16 @@ export function boltStrike(scene: Phaser.Scene, x: number, y: number, depth = 9)
   scene.time.delayedCall(120, () => g.destroy());
 }
 
-/** Fading afterimage trail (agility / teleport). Sprite is already in view space. */
+/** Fading afterimage trail (agility / teleport). */
 export function afterimage(scene: Phaser.Scene, sprite: Phaser.GameObjects.Sprite, tint = 0x88ddff) {
+  const v = viewOf(scene);
+  if (v) {
+    // the Phaser sprite never draws in 3D — leave a streak of glow instead
+    const r = (scene as Phaser.Scene & { racers?: { sprite: Phaser.GameObjects.Sprite; x: number; y: number }[] })
+      .racers?.find((rr) => rr.sprite === sprite);
+    if (r) v.burst3d(r.x, r.y, { color: tint, n: 3, spd: 26, size: 9, life: 300 });
+    return;
+  }
   if (!sprite.visible) return;
   const ghost = scene.add.image(sprite.x, sprite.y, sprite.texture.key, sprite.frame.name)
     .setRotation(sprite.rotation)

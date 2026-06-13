@@ -6,7 +6,7 @@ import { Rng, clamp, wrap01 } from "../util";
 import { Audio } from "../systems/AudioSystem";
 import { burst, boltStrike, floatText, ringPulse } from "../systems/effects";
 import type { AvoidPoint, CandySpot } from "./AIDriver";
-import type { Mode7View } from "../systems/Mode7";
+import type { ThreeView } from "../systems/ThreeView";
 
 interface Candy extends CandySpot {
   img: Phaser.GameObjects.Image;
@@ -105,8 +105,8 @@ export class HazardManager {
   private shadowTexH: number;
   private ringTexW: number;
 
-  private get view(): Mode7View {
-    return (this.scene as Phaser.Scene & { view: Mode7View }).view;
+  private get view(): ThreeView {
+    return (this.scene as Phaser.Scene & { view: ThreeView }).view;
   }
 
   constructor(scene: Phaser.Scene, geom: TrackGeometry, racers: Racer[], seed: number) {

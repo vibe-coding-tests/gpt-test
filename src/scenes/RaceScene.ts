@@ -19,7 +19,8 @@ import { Save } from "../systems/SaveSystem";
 import { Audio } from "../systems/AudioSystem";
 import { burst, afterimage } from "../systems/effects";
 import { clamp, rotLerp, wrap01 } from "../util";
-import { Mode7View, VIEW_LABELS } from "../systems/Mode7";
+import { ThreeView, VIEW_LABELS } from "../systems/ThreeView";
+import type { TrackWorld } from "../systems/TrackRenderer";
 import { Scenery } from "../systems/Scenery";
 import { SpeedFX } from "../systems/SpeedFX";
 import { ITEMS, ITEM_LIST } from "../data/itemsData";
@@ -28,7 +29,7 @@ import type HudScene from "./HudScene";
 export default class RaceScene extends Phaser.Scene {
   trackDef!: TrackDef;
   geom!: TrackGeometry;
-  view!: Mode7View;
+  view!: ThreeView;
   racers: Racer[] = [];
   player!: Racer;
   aiDrivers: AIDriver[] = [];
@@ -62,8 +63,7 @@ export default class RaceScene extends Phaser.Scene {
   private rankBlipCd = 0;
   private speedFX!: SpeedFX;
   private speedK = 0; // smoothed 0..1 rush factor for FOV + speed lines
-  private worldRT!: Phaser.GameObjects.RenderTexture;
-  private skidImg!: Phaser.GameObjects.Image; // reusable stamp for skid marks
+  private world!: TrackWorld;
 
   private keys!: {
     up: Phaser.Input.Keyboard.Key; down: Phaser.Input.Keyboard.Key;
@@ -102,18 +102,14 @@ export default class RaceScene extends Phaser.Scene {
     this.trackDef = getTrack(GameState.trackId);
     this.geom = new TrackGeometry(this.trackDef);
     this.cameras.main.setBackgroundColor(this.trackDef.theme.bg);
-    const world = buildTrackWorld(this, this.geom);
-    this.view = new Mode7View(this, this.geom, this.trackDef.theme, world.rt, world.texKey, Save.viewMode);
+    this.world = buildTrackWorld(this, this.geom);
+    this.view = new ThreeView(this, this.geom, this.trackDef.theme, this.world, Save.viewMode);
     this.scenery = new Scenery(this, this.geom, this.view);
     this.speedFX = new SpeedFX(this);
     this.speedK = 0;
-    // skid marks get stamped straight into the baked track texture — the
-    // Mode 7 shader samples the same texture, so rubber shows up live
-    this.worldRT = world.rt;
-    this.skidImg = this.make.image({ key: "fx-px", add: false });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       Audio.stopLoops();
-      this.skidImg.destroy();
+      this.view.destroy();
     });
 
     // --- spawn racers ---
@@ -404,6 +400,7 @@ export default class RaceScene extends Phaser.Scene {
     this.speedK += (rushTarget - this.speedK) * Math.min(1, dt * 4.5);
     this.view.setSpeed(this.speedK);
     this.speedFX.update(dt, this.view, this.speedK, p.boostT > 0);
+    this.view.update(dt); // animate rigs + particles, render the 3D frame
     if (this.isBattle) this.checkBattleEnd(dt);
     else this.checkRaceEnd(dt);
   }
@@ -635,13 +632,10 @@ export default class RaceScene extends Phaser.Scene {
     const off = r.radius * 0.45;
     const bx = r.x - Math.cos(r.heading) * r.radius * 0.7;
     const by = r.y - Math.sin(r.heading) * r.radius * 0.7;
-    this.skidImg
-      .setDisplaySize(11, 3)
-      .setTint(ice ? 0xeaf6ff : 0x12141c)
-      .setAlpha(ice ? 0.1 : 0.13)
-      .setRotation(va);
-    this.worldRT.draw(this.skidImg, bx + px * off, by + py * off);
-    this.worldRT.draw(this.skidImg, bx - px * off, by - py * off);
+    const col = ice ? 0xeaf6ff : 0x12141c;
+    const alpha = ice ? 0.1 : 0.13;
+    this.world.stamp(bx + px * off, by + py * off, va, 11, 3, col, alpha);
+    this.world.stamp(bx - px * off, by - py * off, va, 11, 3, col, alpha);
   }
 
   private updateFx(dt: number) {
@@ -694,7 +688,8 @@ export default class RaceScene extends Phaser.Scene {
 
   /** Snap the Phaser camera to a sane state for the current view mode. */
   private resetTopCamera() {
-    const cam = this.cameras.main;
+    const cam = this.cameras?.main;
+    if (!cam) return;
     if (this.view.isM7) {
       cam.setScroll(0, 0);
       cam.setRotation(0);
@@ -709,7 +704,8 @@ export default class RaceScene extends Phaser.Scene {
   }
 
   private updateCamera(dt: number) {
-    const cam = this.cameras.main;
+    const cam = this.cameras?.main;
+    if (!cam) return;
     const p = this.player;
 
     if (this.view.isM7) {

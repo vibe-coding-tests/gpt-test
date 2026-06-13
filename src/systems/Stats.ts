@@ -3,26 +3,25 @@ import { clamp } from "../util";
 
 /**
  * Class bases, retuned for the forgiving-hit + defensive-move meta:
- * runners lose a hair of handling (drift tiers got cheaper), flyers trade a
- * touch of top end for steadier steering, floaters and swimmers get a real
- * pace bump (their niches are situational), and heavies — who lost the most
- * when getting hit stopped hurting so much — become the momentum class:
- * highest base speed, slowest wind-up.
+ * runners remain the nimble baseline, flyers trade a little raw speed for
+ * slope/gap privilege, floaters and swimmers get stronger niche pace, and
+ * heavies — who lost the most when hits got more forgiving and guard moves
+ * arrived — become the momentum class: fastest base speed, slowest wind-up.
  */
 const CLASS_BASE: Record<string, { sp: number; ac: number; hd: number; wt: number }> = {
-  runner: { sp: 0.78, ac: 0.85, hd: 0.82, wt: 0.35 },
-  flyer: { sp: 0.8, ac: 0.7, hd: 0.62, wt: 0.4 },
-  floater: { sp: 0.75, ac: 0.78, hd: 0.7, wt: 0.3 },
-  swimmer: { sp: 0.73, ac: 0.72, hd: 0.72, wt: 0.45 },
-  heavy: { sp: 0.72, ac: 0.52, hd: 0.6, wt: 0.95 }
+  runner: { sp: 0.76, ac: 0.86, hd: 0.82, wt: 0.34 },
+  flyer: { sp: 0.75, ac: 0.72, hd: 0.66, wt: 0.38 },
+  floater: { sp: 0.74, ac: 0.8, hd: 0.76, wt: 0.28 },
+  swimmer: { sp: 0.74, ac: 0.74, hd: 0.73, wt: 0.46 },
+  heavy: { sp: 0.82, ac: 0.46, hd: 0.52, wt: 0.98 }
 };
 
 const TYPE_MODS: Partial<Record<PokeType, Partial<Record<"sp" | "ac" | "hd" | "wt", number>>>> = {
   fire: { sp: 0.07 },
-  flying: { sp: 0.05, hd: 0.02 },
+  flying: { sp: 0.03, hd: 0.03 },
   electric: { sp: 0.04, ac: 0.07 },
   dragon: { sp: 0.06, wt: 0.08 },
-  water: { sp: 0.02 },
+  water: { sp: 0.03 },
   normal: { sp: 0.02, ac: 0.02 },
   bug: { ac: 0.04 },
   fighting: { ac: 0.05, wt: 0.04 },
@@ -30,8 +29,8 @@ const TYPE_MODS: Partial<Record<PokeType, Partial<Record<"sp" | "ac" | "hd" | "w
   ghost: { hd: 0.04, wt: -0.12 },
   grass: { hd: 0.03 },
   ice: { hd: -0.02, wt: 0.06 },
-  rock: { wt: 0.22, sp: -0.02 },
-  ground: { wt: 0.12 },
+  rock: { wt: 0.24, sp: -0.01 },
+  ground: { wt: 0.14 },
   poison: { wt: 0.02 }
 };
 

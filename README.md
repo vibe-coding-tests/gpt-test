@@ -5,13 +5,13 @@ every Pokémon races with its own movement style — runners sprint, flyers hove
 over gaps, floaters glide across rough ground, swimmers surge through water,
 and heavies bulldoze everyone else out of the way.
 
-Built with **Phaser 3 + Vite + TypeScript**. Races run in a SNES-style
-**Mode 7 first-person camera** (a GLSL ground shader re-projects the track,
-everything else is billboarded) with four rigs — low road-hugger (default),
-classic, high chase, and a bumper cam — cycled with V; press C for classic
-top-down. Everything
-(sprites, tracks, audio) is generated procedurally at runtime — no external
-assets, no backend. Progress saves to `localStorage`.
+Built with **Phaser 3 + Three.js + Vite + TypeScript**. Races run in a
+real **3D chase camera**: Three.js renders the elevated track mesh, sky,
+scenery, particles and low-poly Pokémon models under the Phaser HUD. Four
+first-person/chase rigs — low road-hugger (default), classic, high chase,
+and bumper cam — are cycled with V; press C for classic top-down modes.
+Everything (models, sprites, tracks, audio) is generated procedurally at
+runtime — no external assets, no backend. Progress saves to `localStorage`.
 
 ## Run it
 
@@ -88,10 +88,11 @@ back out — from a race all the way up to the title screen.
 
 Items come from boxes; **signature moves are yours**. Before every race you
 equip up to **2 moves** from your Pokémon's personal pool (4 per species,
-drawn from its types — Pikachu runs Thunder Wave / Volt Tackle / Swift,
-Charmander runs Flame Charge / Ember Burst, Gengar gets Shadow Sneak…).
-**Every pool is guaranteed a defensive option**, so you can always build
-turtle instead of cannon. In the race they're fired with **Z / X** and
+drawn from its types — Pikachu runs Volt Tackle / Harden / Thunder Wave,
+Charmander runs Flame Charge / Harden / Fire Spin, Gengar gets Shadow
+Sneak…). **Every pool is guaranteed a defensive option in its first two
+unlocks**, so you can build turtle instead of cannon from the start. In the
+race they're fired with **Z / X** and
 paid for from an **energy meter** that charges by driving well: drift
 releases, big air, slipstream bursts, boost pads, landing hits, item
 pickups, finishing laps — and evolving or hitting MAX POWER dumps in a
@@ -117,9 +118,8 @@ Eight move categories, each interacting with the racing model:
   toolkit: Harden blocks the next hit, Withdraw shells through **two**,
   Haze wipes your status and shrouds you untouchable for a beat, Recover
   cleanses and surges you back to pace, and Acid Armor blocks a hit while
-  poisoning anyone who dares a shoulder-check. Rivals bring them too —
-  some swap their second slot for their pool's guard and shell up under
-  pressure
+  poisoning anyone who dares a shoulder-check. Rivals bring them too and
+  shell up under pressure
 - **Transforms** (Dig, Fly, Shadow Sneak) — leave the racing plane
   entirely: tunnel under hazards (and surface with a shockwave), soar over
   gaps as a ground type, or phase out as a ghost
@@ -265,9 +265,10 @@ src/
                         items, cups, movesData (signature moves, pools, XP)
   systems/              Stats, SaveSystem, AudioSystem (chiptune synth),
                         SpriteFactory (procedural sprites), TrackGeometry
-                        (spline + s/d projection), TrackRenderer,
-                        Mode7 (first-person ground shader + billboards),
-                        Scenery (roadside billboard props)
+                        (spline + s/d projection), TrackRenderer
+                        (shared terrain canvas), ThreeView (Three.js
+                        renderer), monmodel (procedural 3D Pokémon),
+                        Scenery (roadside props)
   race/                 Racer (physics/classes/drift/status), AIDriver,
                         BattleAI (battle-mode state machine), ItemManager,
                         MoveManager (signature moves), HazardManager,
@@ -282,5 +283,5 @@ Tracks are defined as closed Catmull-Rom loops; every gameplay query
 track-relative coordinates `(s, d)` — distance along the lap and lateral
 offset — which is what keeps 12 tracks cheap to author and tune. Elevation
 is a sum of gaussian bumps over `s`: the same `heightAt`/`slopeAt` profile
-drives the physics, the Mode 7 horizon pitch, billboard heights, and the
-baked slope shading.
+drives the physics, Three.js ground mesh, chase-camera pitch, billboard
+heights, and baked slope shading.

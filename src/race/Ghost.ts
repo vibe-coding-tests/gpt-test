@@ -3,7 +3,7 @@ import type { GhostData } from "../types";
 import { Racer } from "./Racer";
 import { ensurePokemonTexture } from "../systems/SpriteFactory";
 import { rotLerp } from "../util";
-import type { Mode7View } from "../systems/Mode7";
+import type { ThreeView } from "../systems/ThreeView";
 
 const SAMPLE_MS = 125;
 
@@ -55,7 +55,7 @@ export class GhostPlayer {
     const h = rotLerp(f[i0 * 3 + 2] / 1000, f[i1 * 3 + 2] / 1000, t);
     this.animT += dt * 8;
     this.sprite.setFrame(Math.floor(this.animT) % 2);
-    const view = (this.scene as Phaser.Scene & { view: Mode7View }).view;
+    const view = (this.scene as Phaser.Scene & { view: ThreeView }).view;
     view.submit(this.sprite, this.wx, this.wy, { face: h, lift: 4, topDepth: 4.5 });
   }
 

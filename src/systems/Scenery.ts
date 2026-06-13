@@ -4,7 +4,7 @@ import { Rng } from "../util";
 import { TrackGeometry } from "./TrackGeometry";
 import { ensurePokemonTexture } from "./SpriteFactory";
 import { Audio } from "./AudioSystem";
-import type { Mode7View } from "./Mode7";
+import type { ThreeView } from "./ThreeView";
 
 interface Prop {
   img: Phaser.GameObjects.Image;
@@ -112,7 +112,7 @@ export class Scenery {
   private t = 0;
   private cryCd = 3; // global wild-cry cooldown (don't chorus)
 
-  constructor(private scene: Phaser.Scene, private geom: TrackGeometry, private view: Mode7View) {
+  constructor(private scene: Phaser.Scene, private geom: TrackGeometry, private view: ThreeView) {
     makeSceneryTextures(scene);
     const def = geom.def;
     const rng = new Rng(987 + def.id * 4045);
@@ -301,12 +301,13 @@ export class Scenery {
       }
     }
 
-    // flocks wheel around the sky
+    // flocks wheel around the sky, flying nose-first along the circle
     for (const fl of this.flocks) {
       fl.ang += fl.speed * dt;
       const ca = Math.cos(fl.ang), sa = Math.sin(fl.ang);
       const fx = fl.cx + ca * fl.rx;
       const fy = fl.cy + sa * fl.ry;
+      const heading = Math.atan2(ca * fl.ry * fl.speed, -sa * fl.rx * fl.speed);
       const movingLeft = -sa * fl.rx * fl.speed < 0;
       for (const b of fl.birds) {
         b.img.setFrame(Math.floor(t * 7 + b.phase * 3) % 3);
@@ -314,7 +315,7 @@ export class Scenery {
         const bobL = Math.sin(t * 2.6 + b.phase) * 7;
         this.view.submit(b.img, fx + b.dx, fy + b.dy, {
           lift: fl.lift + bobL, scale: 0.78, topDepth: 2.95, m7Boost: 0.85,
-          rot: Math.sin(t * 1.8 + b.phase) * 0.08
+          face: heading
         });
       }
     }

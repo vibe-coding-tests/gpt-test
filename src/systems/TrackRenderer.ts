@@ -11,22 +11,119 @@ function shadeNum(color: number, f: number): number {
   return (ch((color >> 16) & 0xff) << 16) | (ch((color >> 8) & 0xff) << 8) | ch(color & 0xff);
 }
 
+const css = (color: number, alpha = 1) =>
+  `rgba(${(color >> 16) & 0xff},${(color >> 8) & 0xff},${color & 0xff},${alpha})`;
+
+/**
+ * Tiny Phaser.Graphics-flavored wrapper over Canvas2D so the track painting
+ * code reads the same as it always did — but the result lives on a plain
+ * canvas that BOTH renderers can use: Phaser samples it for the top-down
+ * views and Three.js drapes it over the 3D ground mesh.
+ */
+class D2 {
+  constructor(readonly ctx: CanvasRenderingContext2D) {}
+  fillStyle(color: number, alpha = 1) { this.ctx.fillStyle = css(color, alpha); return this; }
+  lineStyle(w: number, color: number, alpha = 1) {
+    this.ctx.lineWidth = w;
+    this.ctx.strokeStyle = css(color, alpha);
+    return this;
+  }
+  fillRect(x: number, y: number, w: number, h: number) { this.ctx.fillRect(x, y, w, h); return this; }
+  fillCircle(x: number, y: number, r: number) {
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, Math.max(r, 0.1), 0, Math.PI * 2);
+    this.ctx.fill();
+    return this;
+  }
+  /** Phaser semantics: w/h are full width/height (diameters). */
+  fillEllipse(x: number, y: number, w: number, h: number) {
+    this.ctx.beginPath();
+    this.ctx.ellipse(x, y, Math.max(w / 2, 0.1), Math.max(h / 2, 0.1), 0, 0, Math.PI * 2);
+    this.ctx.fill();
+    return this;
+  }
+  fillTriangle(x1: number, y1: number, x2: number, y2: number, x3: number, y3: number) {
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.lineTo(x3, y3);
+    this.ctx.closePath();
+    this.ctx.fill();
+    return this;
+  }
+  fillRoundedRect(x: number, y: number, w: number, h: number, r: number) {
+    const c = this.ctx;
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + w, y, x + w, y + h, r);
+    c.arcTo(x + w, y + h, x, y + h, r);
+    c.arcTo(x, y + h, x, y, r);
+    c.arcTo(x, y, x + w, y, r);
+    c.closePath();
+    c.fill();
+    return this;
+  }
+  fillPoints(pts: Pt[]) {
+    const c = this.ctx;
+    c.beginPath();
+    c.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) c.lineTo(pts[i].x, pts[i].y);
+    c.closePath();
+    c.fill();
+    return this;
+  }
+  lineBetween(x1: number, y1: number, x2: number, y2: number) {
+    this.ctx.beginPath();
+    this.ctx.moveTo(x1, y1);
+    this.ctx.lineTo(x2, y2);
+    this.ctx.stroke();
+    return this;
+  }
+  beginPath() { this.ctx.beginPath(); return this; }
+  moveTo(x: number, y: number) { this.ctx.moveTo(x, y); return this; }
+  lineTo(x: number, y: number) { this.ctx.lineTo(x, y); return this; }
+  strokePath() { this.ctx.stroke(); return this; }
+  arc(x: number, y: number, r: number, a0: number, a1: number) { this.ctx.arc(x, y, r, a0, a1); return this; }
+  strokeCircle(x: number, y: number, r: number) {
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, Math.max(r, 0.1), 0, Math.PI * 2);
+    this.ctx.stroke();
+    return this;
+  }
+  strokeEllipse(x: number, y: number, w: number, h: number) {
+    this.ctx.beginPath();
+    this.ctx.ellipse(x, y, Math.max(w / 2, 0.1), Math.max(h / 2, 0.1), 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+    return this;
+  }
+  strokeRect(x: number, y: number, w: number, h: number) { this.ctx.strokeRect(x, y, w, h); return this; }
+}
+
 export interface TrackWorld {
-  rt: Phaser.GameObjects.RenderTexture;
+  canvas: HTMLCanvasElement;
   texKey: string;
+  /** Top-down view of the world (Phaser image of the same canvas). */
+  image: Phaser.GameObjects.Image;
+  /** Stamp a small rotated rectangle (skid mark) into the world canvas. */
+  stamp(x: number, y: number, rot: number, w: number, h: number, color: number, alpha: number): void;
+  /** Re-upload the canvas to whichever renderer is active. Cheap to throttle. */
+  flush(toPhaser: boolean): boolean;
 }
 
 /**
- * Renders the whole track world once into a RenderTexture
- * (terrain, corridor, road, features, rails, decorations).
- * Also registers it in the texture manager so the Mode 7 ground
- * shader can sample it.
+ * Renders the whole track world once into a shared canvas (terrain, corridor,
+ * road, features, rails, decorations). The canvas backs the Phaser top-down
+ * image AND the Three.js ground texture, so live skid marks show up in both.
  */
 export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): TrackWorld {
   const def = geom.def;
   const W = Math.ceil(geom.worldW);
   const H = Math.ceil(geom.worldH);
-  const g = scene.make.graphics(undefined, false);
+  const canvas = document.createElement("canvas");
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext("2d")!;
+  const g = new D2(ctx);
   const rng = new Rng(1234 + def.id * 777);
   const N = geom.xs.length;
 
@@ -43,7 +140,7 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
         { x: geom.xs[k2] + geom.nx[k2] * lo2, y: geom.ys[k2] + geom.ny[k2] * lo2 }
       ];
       g.fillStyle(color(k), alpha);
-      g.fillPoints(pts, true);
+      g.fillPoints(pts);
     }
   };
 
@@ -61,7 +158,7 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
         { x: b.x + b.nx * d0, y: b.y + b.ny * d0 }
       ];
       g.fillStyle(color, alpha);
-      g.fillPoints(pts, true);
+      g.fillPoints(pts);
     }
   };
 
@@ -179,7 +276,7 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
         { x: geom.xs[k2] - geom.nx[k2] * w, y: geom.ys[k2] - geom.ny[k2] * w }
       ];
       g.fillStyle(sl > 0 ? 0xffffff : 0x000000, a);
-      g.fillPoints(pts, true);
+      g.fillPoints(pts);
     }
     // crest ticks where the slope flips downhill
     for (let k = 0; k < N; k += 2) {
@@ -209,7 +306,7 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
           { x: p.x + p.nx * d0 + p.tx * (row + 1) * sq, y: p.y + p.ny * d0 + p.ty * (row + 1) * sq }
         ];
         g.fillStyle((row + c) % 2 === 0 ? 0xffffff : 0x16161e, 1);
-        g.fillPoints(pts, true);
+        g.fillPoints(pts);
       }
     }
     // starting-grid slot brackets behind the line
@@ -278,17 +375,38 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
 
   drawDecorations(g, geom, rng);
 
-  const rt = scene.add.renderTexture(0, 0, W, H).setOrigin(0, 0).setDepth(0);
-  rt.draw(g, 0, 0);
-  g.destroy();
-
   const texKey = `m7-world-${def.id}`;
   if (scene.textures.exists(texKey)) scene.textures.remove(texKey);
-  rt.saveTexture(texKey);
-  return { rt, texKey };
+  scene.textures.addCanvas(texKey, canvas);
+  const image = scene.add.image(0, 0, texKey).setOrigin(0, 0).setDepth(0);
+
+  let dirty = false;
+  return {
+    canvas,
+    texKey,
+    image,
+    stamp(x, y, rot, w, h, color, alpha) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = css(color, alpha);
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.restore();
+      dirty = true;
+    },
+    flush(toPhaser: boolean) {
+      if (!dirty) return false;
+      dirty = false;
+      if (toPhaser) {
+        const tex = scene.textures.get(texKey) as Phaser.Textures.CanvasTexture;
+        tex.refresh();
+      }
+      return true;
+    }
+  };
 }
 
-function decorateFeature(g: Phaser.GameObjects.Graphics, geom: TrackGeometry, f: Feature, rng: Rng) {
+function decorateFeature(g: D2, geom: TrackGeometry, f: Feature, rng: Rng) {
   const mid = (f.d0 + f.d1) / 2;
   const span = wrap01(f.s1 - f.s0) || (f.s1 - f.s0);
   if (f.kind === "boost") {
@@ -357,7 +475,7 @@ function decorateFeature(g: Phaser.GameObjects.Graphics, geom: TrackGeometry, f:
   }
 }
 
-function drawDecorations(g: Phaser.GameObjects.Graphics, geom: TrackGeometry, rng: Rng) {
+function drawDecorations(g: D2, geom: TrackGeometry, rng: Rng) {
   const def = geom.def;
   const N = geom.xs.length;
   const deco = def.theme.deco;

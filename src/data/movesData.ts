@@ -3,7 +3,7 @@ import type { PokeType, PokemonDef } from "../types";
 /**
  * Signature moves: every Pokémon carries a personal move pool derived from
  * its typing (2 moves per type, padded with normal-type staples so every
- * pool is exactly 4, and always including one defensive option). Moves are
+ * pool is exactly 4, with a defensive option in the first two unlocks). Moves are
  * fired from an energy meter charged by good driving — drift releases,
  * airtime, slipstream, boost pads, laps and landed hits — and unlock per
  * species as you race with it (XP levels).
@@ -34,15 +34,15 @@ const M = (id: string, name: string, type: PokeType, cost: number, cat: MoveCat,
 export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   // normal — the universal staples that pad every shallow pool
   M("quickattack", "Quick Attack", "normal", 35, "dash", "Instant short dash with razor-sharp steering."),
-  M("swift", "Swift", "normal", 40, "shot", "Homing star — never misses the nearest racer ahead."),
+  M("swift", "Swift", "normal", 45, "shot", "Homing star — never misses the nearest racer ahead."),
   M("bodyslam", "Body Slam", "normal", 45, "pulse", "Leap and slam down — the shockwave spins anyone nearby."),
-  M("roar", "Roar", "normal", 35, "pulse", "Bellow ahead — racers in the cone flinch, slow and scatter."),
+  M("roar", "Roar", "normal", 40, "pulse", "Bellow ahead — racers in the cone flinch, slow and scatter."),
   // guards — the defensive layer: shields, shells and cleanses
-  M("harden", "Harden", "normal", 30, "guard", "Tense up — a tough hide blocks the next hit for a while."),
-  M("recover", "Recover", "normal", 35, "guard", "Shrug off every status and surge back up to pace."),
-  M("withdraw", "Withdraw", "water", 40, "guard", "Tuck into the shell — soaks the next TWO hits."),
-  M("haze", "Haze", "ice", 40, "guard", "Icy veil: wipes your statuses and shrouds you, untouchable."),
-  M("acidarmor", "Acid Armor", "poison", 45, "guard", "Melt into ooze — blocks a hit, poisons anyone who bumps you."),
+  M("harden", "Harden", "normal", 35, "guard", "Tense up — a tough hide blocks the next hit for a while."),
+  M("recover", "Recover", "normal", 45, "guard", "Shrug off every status and surge back up to pace."),
+  M("withdraw", "Withdraw", "water", 45, "guard", "Tuck into the shell — soaks the next TWO hits."),
+  M("haze", "Haze", "ice", 45, "guard", "Icy veil: wipes your statuses and shrouds you, untouchable."),
+  M("acidarmor", "Acid Armor", "poison", 50, "guard", "Melt into ooze — blocks a hit, poisons anyone who bumps you."),
   // fire
   M("flamecharge", "Flame Charge", "fire", 45, "dash", "Blazing sprint — burns on contact, lava can't touch you."),
   M("firespin", "Fire Spin", "fire", 45, "zone", "Drop a fire vortex that scorches whoever drives through."),
@@ -51,16 +51,16 @@ export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   M("raindance", "Rain Dance", "water", 55, "buff", "Summon rain: rivals slip and slow, water types speed up."),
   // electric
   M("volttackle", "Volt Tackle", "electric", 50, "dash", "Electric charge — paralyzes everyone you blast through."),
-  M("thunderwave", "Thunder Wave", "electric", 35, "pulse", "Crackling arc ahead — paralyzes in a cone."),
+  M("thunderwave", "Thunder Wave", "electric", 40, "pulse", "Crackling arc ahead — paralyzes in a cone."),
   // grass
   M("vinewhip", "Vine Whip", "grass", 40, "pulse", "Lash the racer ahead: they spin, you slingshot forward."),
   M("stunspore", "Stun Spore", "grass", 40, "zone", "Drop a paralyzing spore cloud behind you."),
   // ice
-  M("iceshard", "Ice Shard", "ice", 35, "shot", "Cheap, fast icicle — a quick freeze for whoever's ahead."),
+  M("iceshard", "Ice Shard", "ice", 40, "shot", "Cheap, fast icicle — a quick freeze for whoever's ahead."),
   M("frostmist", "Frost Mist", "ice", 45, "zone", "Trail a freezing mist that chills your pursuers."),
   // fighting
   M("machpunch", "Mach Punch", "fighting", 40, "dash", "Lightning lunge — first contact sends them spinning."),
-  M("counter", "Counter", "fighting", 40, "stance", "Brace briefly — the next hit bounces back at the attacker."),
+  M("counter", "Counter", "fighting", 45, "stance", "Brace briefly — the next hit bounces back at the attacker."),
   // poison
   M("acidspray", "Acid Spray", "poison", 40, "shot", "Lob a glob that bursts into a lingering acid puddle."),
   M("sludgewave", "Sludge Wave", "poison", 50, "pulse", "Poison nova — everyone close gets spun and poisoned."),
@@ -81,7 +81,7 @@ export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   M("rockpolish", "Rock Polish", "rock", 45, "buff", "Polish up: a surge of speed and offroad means nothing."),
   // ghost
   M("shadowsneak", "Shadow Sneak", "ghost", 45, "transform", "Phase out — slip through racers, shots and hazards."),
-  M("lick", "Lick", "ghost", 35, "pulse", "Close-range lick — paralyzes them, you steal their pace."),
+  M("lick", "Lick", "ghost", 40, "pulse", "Close-range lick — paralyzes them, you steal their pace."),
   // dragon
   M("dragonbreath", "Dragon Breath", "dragon", 45, "pulse", "Searing cone of breath — spins and numbs the pack ahead."),
   M("dragonrush", "Dragon Rush", "dragon", 50, "dash", "Bulldozing charge — scatter anyone in the way, any size.")
@@ -122,8 +122,8 @@ const DEFENSIVE_CATS: MoveCat[] = ["stance", "guard", "transform"];
 /**
  * A species' move pool: interleave its types' moves, pad with normal
  * staples to exactly 4. Order = unlock order (level 1 → 4).
- * Every pool is guaranteed one defensive option — if the type moves came
- * out all offense/speed, the third unlock becomes the type's guard move.
+ * Every pool is guaranteed one early defensive option. If the first two
+ * unlocks came out all offense/speed, slot 2 becomes the type's guard move.
  */
 export function movePool(def: PokemonDef): MoveDef[] {
   const lists = def.types.map((t) => [...TYPE_MOVES[t]]);
@@ -138,11 +138,13 @@ export function movePool(def: PokemonDef): MoveDef[] {
     if (ids.length >= 4) break;
     if (!ids.includes(id)) ids.push(id);
   }
-  const pool = ids.slice(0, 4);
-  if (!pool.some((id) => DEFENSIVE_CATS.includes(MOVES[id].cat))) {
+  let pool = ids.slice(0, 4);
+  if (!pool.slice(0, 2).some((id) => DEFENSIVE_CATS.includes(MOVES[id].cat))) {
     const guard = def.types.map((t) => GUARD_BY_TYPE[t]).find((g) => g && !pool.includes(g))
       ?? "harden";
-    pool[Math.min(2, pool.length - 1)] = guard;
+    const shifted = pool.filter((id) => id !== guard);
+    shifted.splice(Math.min(1, shifted.length), 0, guard);
+    pool = shifted.slice(0, 4);
   }
   return pool.map((id) => MOVES[id]);
 }

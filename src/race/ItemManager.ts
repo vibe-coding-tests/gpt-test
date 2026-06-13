@@ -8,7 +8,7 @@ import { Audio } from "../systems/AudioSystem";
 import { Save } from "../systems/SaveSystem";
 import { boltStrike, burst, floatText, ringPulse, afterimage } from "../systems/effects";
 import type { AvoidPoint } from "./AIDriver";
-import type { Mode7View } from "../systems/Mode7";
+import type { ThreeView } from "../systems/ThreeView";
 
 const DEG = Math.PI / 180;
 
@@ -120,8 +120,8 @@ export class ItemManager {
     return best;
   }
 
-  private get view(): Mode7View {
-    return (this.scene as Phaser.Scene & { view: Mode7View }).view;
+  private get view(): ThreeView {
+    return (this.scene as Phaser.Scene & { view: ThreeView }).view;
   }
 
   private spawnBoxes() {

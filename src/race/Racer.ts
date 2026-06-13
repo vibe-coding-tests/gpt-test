@@ -7,7 +7,7 @@ import { TrackGeometry, type Projection } from "../systems/TrackGeometry";
 import { clamp, lerp, wrap01, wrapAngle } from "../util";
 import { Audio } from "../systems/AudioSystem";
 import { burst, floatText, ringPulse } from "../systems/effects";
-import type { Mode7View } from "../systems/Mode7";
+import type { ThreeView } from "../systems/ThreeView";
 
 export interface RacerInput {
   throttle: number;
@@ -150,8 +150,8 @@ export class Racer {
     this.updateShadowSize();
   }
 
-  private get view(): Mode7View {
-    return (this.scene as Phaser.Scene & { view: Mode7View }).view;
+  private get view(): ThreeView {
+    return (this.scene as Phaser.Scene & { view: ThreeView }).view;
   }
 
   private updateShadowSize() {
@@ -969,19 +969,22 @@ export class Racer {
     if (this.status.squash > 0) { sx = airScale * 1.15; sy = airScale * 0.55; }
 
     let face = this.heading;
+    let lean = 0; // body roll, read by the 3D rig
     if (this.status.spin > 0) {
       face += (1 - this.status.spin / 0.8) * Math.PI * 4;
     } else if (this.drifting) {
-      face += this.driftDir * 0.35;
+      face += this.driftDir * 0.3;
+      lean = this.driftDir * 0.3;
     } else {
-      face += this.steerSm * 0.14; // lean into the turn
+      face += this.steerSm * 0.12; // lean into the turn
+      lean = this.steerSm * 0.16;
     }
 
-    // bumper cam: your own sprite is the camera, so don't draw it
+    // bumper cam: your own model is the camera, so don't draw it
     const hideMe = this.isPlayer && this.view.isM7 && !this.view.showPlayer;
     const dugIn = this.transform === "dig"; // underground: only the dirt mound shows
     this.view.submit(this.sprite, this.x, this.y, {
-      show: !hideMe && !dugIn, face, scale: sx, scaleY: sy, lift,
+      show: !hideMe && !dugIn, face, rot: lean, scale: sx, scaleY: sy, lift,
       topDepth: 5 + this.index * 0.01
     });
     if (dugIn && Math.random() < dt * 22) {

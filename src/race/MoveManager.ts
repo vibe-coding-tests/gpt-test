@@ -5,7 +5,7 @@ import { MOVES, MoveDef } from "../data/movesData";
 import { Audio } from "../systems/AudioSystem";
 import { burst, floatText, ringPulse } from "../systems/effects";
 import { clamp, wrapAngle } from "../util";
-import type { Mode7View } from "../systems/Mode7";
+import type { ThreeView } from "../systems/ThreeView";
 
 /**
  * Signature moves: the personal layer on top of item-box specials.
@@ -80,8 +80,8 @@ export class MoveManager {
     this.battle = battle;
   }
 
-  private get view(): Mode7View {
-    return (this.scene as Phaser.Scene & { view: Mode7View }).view;
+  private get view(): ThreeView {
+    return (this.scene as Phaser.Scene & { view: ThreeView }).view;
   }
 
   private foesOf(r: Racer): Racer[] {

@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { GAME_W, GAME_H } from "../constants";
 import { clamp } from "../util";
-import type { Mode7View } from "./Mode7";
+import type { ThreeView } from "./ThreeView";
 
 interface Streak {
   img: Phaser.GameObjects.Image;
@@ -31,7 +31,7 @@ export class SpeedFX {
   }
 
   /** k: 0..1 speed-rush factor (same one driving the FOV stretch). */
-  update(dt: number, view: Mode7View, k: number, boosting: boolean) {
+  update(dt: number, view: ThreeView, k: number, boosting: boolean) {
     const active = view.isM7 && k > 0.04;
     const cx = GAME_W / 2;
     const cy = clamp(view.hor, 90, GAME_H * 0.6); // vanishing point rides the horizon

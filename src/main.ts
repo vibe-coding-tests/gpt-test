@@ -18,6 +18,9 @@ const game = new Phaser.Game({
   width: GAME_W,
   height: GAME_H,
   backgroundColor: "#0b0c1a",
+  // the 3D world renders on its own canvas UNDER this one; the race scene
+  // clears to transparent so the Phaser layer carries only sprites + UI
+  transparent: true,
   render: { antialias: true, roundPixels: false },
   scale: {
     mode: Phaser.Scale.FIT,
