@@ -160,9 +160,9 @@ const ROWS: Row[] = [
   [146, "Moltres", "fire", "flying", "F", 2, "bird", "#f0843a", "#fdc83a", "#e83a0a", []],
   [147, "Dratini", "dragon", null, "S", 0, "serpent", "#6878d8", "#e8ecf8", "#3a4aa8", [148]],
   [148, "Dragonair", "dragon", null, "S", 1, "serpent", "#5868c8", "#e0e8f4", "#2a3a98", [149]],
-  [149, "Dragonite", "dragon", "flying", "F", 2, "biped", "#e8a848", "#f8e0b0", "#58b8a8", [], 0.08],
-  [150, "Mewtwo", "psychic", null, "L", 2, "biped", "#d8c8e8", "#f0e8f8", "#7a4ab8", [], 0.1],
-  [151, "Mew", "psychic", null, "L", 0, "blob", "#f0b8d8", "#fce0ee", "#c888a8", [], 0.06]
+  [149, "Dragonite", "dragon", "flying", "F", 2, "biped", "#e8a848", "#f8e0b0", "#58b8a8", [], 0.04],
+  [150, "Mewtwo", "psychic", null, "L", 2, "biped", "#d8c8e8", "#f0e8f8", "#7a4ab8", [], 0.05],
+  [151, "Mew", "psychic", null, "L", 0, "blob", "#f0b8d8", "#fce0ee", "#c888a8", [], 0.03]
 ];
 
 const LEGENDARY = new Set([144, 145, 146, 150, 151]);

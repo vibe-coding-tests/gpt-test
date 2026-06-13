@@ -11,6 +11,7 @@ const OPTIONS = [
   { key: "tt", label: "TIME TRIAL", desc: "Race the clock and your ghost" },
   { key: "dex", label: "POKéDEX", desc: "Your roster — win races to unlock all 151" },
   { key: "help", label: "HOW TO PLAY", desc: "Controls and racing tips" },
+  { key: "controls", label: "CONTROLS", desc: "View and remap your keys" },
   { key: "cheats", label: "CHEATS", desc: "Debug switches — unlock all, easy rivals, debug keys" }
 ];
 
@@ -48,14 +49,14 @@ export default class MenuScene extends Phaser.Scene {
     }
 
     OPTIONS.forEach((opt, i) => {
-      const t = this.add.text(GAME_W / 2, 218 + i * 56, opt.label, {
+      const t = this.add.text(GAME_W / 2, 206 + i * 52, opt.label, {
         fontFamily: UI.font, fontSize: "34px", fontStyle: "bold", color: "#ffffff",
         stroke: "#0a1030", strokeThickness: 8
       }).setOrigin(0.5);
       this.rows.push(t);
     });
 
-    this.descText = this.add.text(GAME_W / 2, 540, "", {
+    this.descText = this.add.text(GAME_W / 2, 600, "", {
       fontFamily: UI.font, fontSize: "17px", color: "#aebbe8"
     }).setOrigin(0.5);
 
@@ -114,6 +115,7 @@ export default class MenuScene extends Phaser.Scene {
     else if (key === "battle") this.scene.start("Select", { flow: "battle" });
     else if (key === "tt") this.scene.start("Select", { flow: "tt" });
     else if (key === "dex") this.scene.start("Pokedex");
+    else if (key === "controls") this.scene.start("Controls");
     else if (key === "cheats") this.scene.start("Cheats");
     else this.showHelp();
   }

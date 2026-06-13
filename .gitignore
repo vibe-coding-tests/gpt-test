@@ -3,3 +3,9 @@ dist/
 shots/
 .DS_Store
 *.log
+
+# Playwright
+.pw-browsers/
+test-results/
+playwright-report/
+.playwright-mcp/

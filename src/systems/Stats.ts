@@ -2,36 +2,44 @@ import type { DerivedStats, PokemonDef, PokeType } from "../types";
 import { clamp } from "../util";
 
 /**
- * Class bases, retuned for the forgiving-hit + defensive-move meta:
- * runners remain the nimble baseline, flyers trade a little raw speed for
- * slope/gap privilege, floaters and swimmers get stronger niche pace, and
- * heavies — who lost the most when hits got more forgiving and guard moves
- * arrived — become the momentum class: fastest base speed, slowest wind-up.
+ * Class bases. Every class is a side-grade, not a tier: each trades a real
+ * weakness for its strength, and no class wins on every axis.
+ *   runner  — best accel + cornering, modest top speed, light
+ *   flyer   — high top speed + gap/slope/terrain privilege, but wide turns
+ *   floater — nimble and skims rough ground, but drifts wide (low grip)
+ *   swimmer — average on land, surges in water, on the heavy side
+ *   heavy   — fastest top speed + huge mass (bulldozes), but sluggish to
+ *             accelerate and steer, and ruled by gravity on slopes
  */
 const CLASS_BASE: Record<string, { sp: number; ac: number; hd: number; wt: number }> = {
-  runner: { sp: 0.76, ac: 0.86, hd: 0.82, wt: 0.34 },
-  flyer: { sp: 0.75, ac: 0.72, hd: 0.66, wt: 0.38 },
-  floater: { sp: 0.74, ac: 0.8, hd: 0.76, wt: 0.28 },
-  swimmer: { sp: 0.74, ac: 0.74, hd: 0.73, wt: 0.46 },
-  heavy: { sp: 0.82, ac: 0.46, hd: 0.52, wt: 0.98 }
+  runner: { sp: 0.74, ac: 0.88, hd: 0.86, wt: 0.32 },
+  flyer: { sp: 0.80, ac: 0.72, hd: 0.60, wt: 0.34 },
+  floater: { sp: 0.74, ac: 0.80, hd: 0.70, wt: 0.26 },
+  swimmer: { sp: 0.72, ac: 0.74, hd: 0.78, wt: 0.46 },
+  heavy: { sp: 0.88, ac: 0.46, hd: 0.52, wt: 0.96 }
 };
 
+/**
+ * Type modifiers are trade-offs: each gives with one hand and takes with the
+ * other, so picking a type is a flavor choice, never a free stat bump. (wt
+ * raises mass — good for shoving, bad for getting redirected.)
+ */
 const TYPE_MODS: Partial<Record<PokeType, Partial<Record<"sp" | "ac" | "hd" | "wt", number>>>> = {
-  fire: { sp: 0.07 },
-  flying: { sp: 0.03, hd: 0.03 },
-  electric: { sp: 0.04, ac: 0.07 },
-  dragon: { sp: 0.06, wt: 0.08 },
-  water: { sp: 0.03 },
-  normal: { sp: 0.02, ac: 0.02 },
-  bug: { ac: 0.04 },
-  fighting: { ac: 0.05, wt: 0.04 },
-  psychic: { hd: 0.06, ac: 0.03 },
-  ghost: { hd: 0.04, wt: -0.12 },
-  grass: { hd: 0.03 },
-  ice: { hd: -0.02, wt: 0.06 },
-  rock: { wt: 0.24, sp: -0.01 },
-  ground: { wt: 0.14 },
-  poison: { wt: 0.02 }
+  fire: { sp: 0.06, hd: -0.05 },          // quick but loose
+  water: { hd: 0.05, sp: -0.04 },         // planted, slower
+  electric: { ac: 0.07, hd: -0.05 },      // explosive launch, nervous grip
+  grass: { hd: 0.05, ac: -0.04 },         // grippy, slow to rev
+  ice: { sp: 0.05, hd: -0.06 },           // fast and slick
+  fighting: { ac: 0.06, wt: 0.04, sp: -0.04 },
+  poison: { hd: 0.04, wt: 0.02, sp: -0.03 },
+  ground: { wt: 0.12, ac: -0.04 },        // heavy-footed
+  flying: { sp: 0.04, wt: -0.04, hd: -0.03 }, // light and fast, loose
+  psychic: { hd: 0.05, ac: 0.03, sp: -0.05 }, // finesse, low top end
+  bug: { ac: 0.05, sp: -0.04 },           // nimble, slow
+  rock: { wt: 0.20, sp: -0.04, ac: -0.05 }, // tanky and sluggish
+  ghost: { hd: 0.05, sp: 0.02, wt: -0.12 }, // floaty and nimble
+  dragon: { sp: 0.06, wt: 0.08, ac: -0.05 }, // powerful, heavy, slow to spin up
+  normal: { ac: 0.02, hd: 0.02, sp: -0.02 }  // jack of all trades
 };
 
 /** Derive racing stats from a Pokémon's class, types, size and evolution stage. */
@@ -49,14 +57,18 @@ export function deriveStats(def: PokemonDef): DerivedStats {
     wt += (mods.wt ?? 0) * scale;
   });
 
-  wt += def.size * 0.18 - 0.05;
-  hd += (1 - def.size) * 0.04;
-  if (def.size === 2) sp += 0.03;
+  // Size is a genuine trade-off, not a free upgrade.
+  if (def.size === 0) {
+    ac += 0.05; hd += 0.05; wt -= 0.08;       // small: nimble + light, but easily shoved
+  } else if (def.size === 2) {
+    sp += 0.05; wt += 0.16; ac -= 0.06; hd -= 0.05; // large: fast + massive, sluggish to turn/rev
+  }
 
-  if (def.legendary) { sp += 0.05; ac += 0.04; }
+  // Legendaries are side-grades: extra pace paid for with looser handling.
+  if (def.legendary) { sp += 0.05; hd -= 0.05; }
 
   // Pre-evolutions are weaker; collecting Rare Candies closes the gap.
-  const stageMult = 1 - 0.06 * def.evosRemaining;
+  const stageMult = 1 - 0.05 * def.evosRemaining;
   sp = sp * stageMult + (def.pow ?? 0);
   ac = ac * stageMult + (def.pow ?? 0) * 0.6;
 
@@ -102,11 +114,15 @@ export function typeEffect(attack: PokeType, defenderTypes: PokeType[]): number 
   return m;
 }
 
-/** Multiplier for slow terrain off the road, by movement class. */
+/**
+ * Multiplier for slow terrain off the road, by movement class. Always < 1 so
+ * cutting a corner onto the rough always costs you something — specialists just
+ * pay less. (Cutting is also gated by lap checkpoints; this is the speed tax.)
+ */
 export function offroadMult(def: PokemonDef, offroadKind: string): number {
-  if (def.cls === "floater") return 1.0;       // glides over rough ground
-  if (def.cls === "flyer") return 0.85;        // hovers above most of it
-  if (def.types.includes("grass") && offroadKind === "grass") return 1.06;
+  if (def.cls === "floater") return 0.9;       // glides, but the rough still nips
+  if (def.cls === "flyer") return 0.82;        // hovers above most of it
+  if (def.types.includes("grass") && offroadKind === "grass") return 0.92; // at home, not faster than road
   if (def.types.includes("ground") && (offroadKind === "sand" || offroadKind === "rock")) return 0.8;
   if (def.cls === "heavy") return 0.66; // bulldozes through, slowly
   return 0.55;

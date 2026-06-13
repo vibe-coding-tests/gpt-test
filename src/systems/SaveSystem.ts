@@ -1,9 +1,10 @@
 import { SAVE_KEY, STARTER_IDS, UNLOCK_ORDER } from "../constants";
 import { ALL_IDS, getPokemon } from "../data/pokemonData";
 import { movePool, unlockedCount } from "../data/movesData";
+import { type Action, type Binds, normalizeBinds } from "./Controls";
 import type { GhostData } from "../types";
 
-type ViewSetting = "m7" | "rotate" | "north";
+type ViewSetting = "m7" | "rotate";
 
 export interface CheatSettings {
   unlockAll: boolean;      // every Pokémon + every cup selectable
@@ -23,6 +24,7 @@ interface SaveBlob {
   xp: Record<number, number>;            // speciesId -> move XP (races finished etc.)
   loadouts: Record<number, string[]>;    // speciesId -> equipped move ids (max 2)
   settings: { muted: boolean; view: ViewSetting; cam: number };
+  keybinds: Partial<Binds>;               // remapped controls (missing actions use defaults)
   cheats: CheatSettings;
 }
 
@@ -41,6 +43,7 @@ function defaults(): SaveBlob {
     xp: {},
     loadouts: {},
     settings: { muted: false, view: "m7", cam: 0 },
+    keybinds: {},
     cheats: defaultCheats()
   };
 }
@@ -192,12 +195,35 @@ class SaveSystem {
   get muted() { return this.data.settings.muted; }
   set muted(v: boolean) { this.data.settings.muted = v; this.persist(); }
   get viewMode(): ViewSetting {
-    const v = this.data.settings.view;
-    return v === "m7" || v === "rotate" || v === "north" ? v : "m7";
+    // the old "north" top-down mode was retired — fold it into the rotating top-down
+    const v = this.data.settings.view as string;
+    return v === "rotate" || v === "north" ? "rotate" : "m7";
   }
   set viewMode(v: ViewSetting) { this.data.settings.view = v; this.persist(); }
   get camPreset(): number { return this.data.settings.cam ?? 0; }
   set camPreset(v: number) { this.data.settings.cam = v; this.persist(); }
+
+  /** Full keybind map: saved overrides merged onto the defaults. */
+  binds(): Binds {
+    return normalizeBinds(this.data.keybinds);
+  }
+
+  /** Rebind an action to new key codes, clearing those codes from every other action. */
+  rebind(action: Action, codes: number[]) {
+    const binds = this.binds();
+    binds[action] = codes.slice(0, 2);
+    for (const a of Object.keys(binds) as Action[]) {
+      if (a === action) continue;
+      binds[a] = binds[a].filter((c) => !codes.includes(c));
+    }
+    this.data.keybinds = binds;
+    this.persist();
+  }
+
+  resetBinds() {
+    this.data.keybinds = {};
+    this.persist();
+  }
 }
 
 export const Save = new SaveSystem();

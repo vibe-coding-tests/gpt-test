@@ -37,6 +37,13 @@ const SLOPE_FACTOR: Record<string, { up: number; down: number }> = {
 export const DRIFT_TIERS = [0.8, 1.7, 2.7];
 export const DRIFT_COLORS = [0x66ccff, 0xffaa33, 0xd06aff];
 
+/**
+ * Checkpoints a lap must clear before the finish line will count it. Buckets are
+ * defined purely along the centerline (s), so any forward driving passes through
+ * them in order — a big shortcut that skips a section can't bank the lap.
+ */
+const CHECKPOINTS = 12;
+
 export class Racer {
   scene: Phaser.Scene;
   geom: TrackGeometry;
@@ -119,6 +126,9 @@ export class Racer {
   speedMult = 1; // rubber band (AI only)
 
   lastSafeS = 0;
+  // lap validation: every checkpoint must be touched before a lap line counts
+  private cpHits: boolean[] = new Array(CHECKPOINTS).fill(false);
+  private cutWarnT = 0; // debounce for the "wrong way" warning
   animT = 0;
   private landT = 0; // squash-on-landing timer
   private wasAirborne = false;
@@ -173,6 +183,8 @@ export class Racer {
     this.proj = this.geom.project(x, y);
     this.totalProgress = this.proj.s > 0.5 ? this.proj.s - 1 : this.proj.s;
     this.lastSafeS = this.proj.s;
+    this.cpHits = new Array(CHECKPOINTS).fill(false);
+    this.cpHits[Math.floor(wrap01(this.proj.s) * CHECKPOINTS) % CHECKPOINTS] = true;
     this.syncVisual(0);
   }
 
@@ -588,6 +600,7 @@ export class Racer {
       if (this.shieldT <= 0) this.shieldHits = 0;
     }
     this.acidT = Math.max(0, this.acidT - dt);
+    this.cutWarnT = Math.max(0, this.cutWarnT - dt);
     if (this.rouletteT > 0) this.rouletteT -= dt;
     this.moveCdT = Math.max(0, this.moveCdT - dt);
     this.reflectT = Math.max(0, this.reflectT - dt);
@@ -810,7 +823,29 @@ export class Racer {
     let ds = this.proj.s - prevS;
     if (ds > 0.5) ds -= 1;
     if (ds < -0.5) ds += 1;
+    const beforeTP = this.totalProgress;
     this.totalProgress += ds;
+
+    // --- checkpoint lap validation (open battle arenas have no laps) ---
+    if (!this.geom.def.arena) {
+      const ci = Math.floor(wrap01(this.proj.s) * CHECKPOINTS) % CHECKPOINTS;
+      this.cpHits[ci] = true;
+      const boundary = Math.floor(beforeTP) + 1; // the next lap line ahead
+      if (boundary >= 1 && this.totalProgress >= boundary) {
+        if (this.cpHits.every(Boolean)) {
+          this.cpHits.fill(false);
+          this.cpHits[ci] = true; // already standing on the new lap's first checkpoint
+        } else {
+          // crossed the line without completing the lap — don't bank it
+          this.totalProgress = boundary - 1e-4;
+          if (this.isPlayer && this.cutWarnT <= 0) {
+            this.cutWarnT = 3;
+            this.hudToast("FOLLOW THE TRACK — LAP NOT COUNTED", "#ff8a8a");
+            floatText(this.scene, this.x, this.y - 40, "WRONG WAY!", "#ff8a8a", 16);
+          }
+        }
+      }
+    }
 
     // --- surface response ---
     this.airT = Math.max(0, this.airT - dt);

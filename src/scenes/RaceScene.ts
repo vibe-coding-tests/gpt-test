@@ -20,6 +20,7 @@ import { Audio } from "../systems/AudioSystem";
 import { burst, afterimage } from "../systems/effects";
 import { clamp, rotLerp, wrap01 } from "../util";
 import { ThreeView, VIEW_LABELS } from "../systems/ThreeView";
+import type { Action } from "../systems/Controls";
 import type { TrackWorld } from "../systems/TrackRenderer";
 import { Scenery } from "../systems/Scenery";
 import { SpeedFX } from "../systems/SpeedFX";
@@ -65,13 +66,8 @@ export default class RaceScene extends Phaser.Scene {
   private speedK = 0; // smoothed 0..1 rush factor for FOV + speed lines
   private world!: TrackWorld;
 
-  private keys!: {
-    up: Phaser.Input.Keyboard.Key; down: Phaser.Input.Keyboard.Key;
-    left: Phaser.Input.Keyboard.Key; right: Phaser.Input.Keyboard.Key;
-    w: Phaser.Input.Keyboard.Key; a: Phaser.Input.Keyboard.Key;
-    s: Phaser.Input.Keyboard.Key; d: Phaser.Input.Keyboard.Key;
-    space: Phaser.Input.Keyboard.Key; shift: Phaser.Input.Keyboard.Key;
-  };
+  // remappable controls: each action maps to one or two Phaser keys
+  private actionKeys!: Record<Action, Phaser.Input.Keyboard.Key[]>;
 
   constructor() {
     super("Race");
@@ -202,23 +198,25 @@ export default class RaceScene extends Phaser.Scene {
       if (gdata) this.ghostPlay = new GhostPlayer(this, gdata);
     }
 
-    // --- input ---
+    // --- input: driven by the player's (remappable) keybinds ---
     const kb = this.input.keyboard!;
-    const K = Phaser.Input.Keyboard.KeyCodes;
-    this.keys = {
-      up: kb.addKey(K.UP), down: kb.addKey(K.DOWN),
-      left: kb.addKey(K.LEFT), right: kb.addKey(K.RIGHT),
-      w: kb.addKey(K.W), a: kb.addKey(K.A), s: kb.addKey(K.S), d: kb.addKey(K.D),
-      space: kb.addKey(K.SPACE), shift: kb.addKey(K.SHIFT)
-    };
-    // event-based (not JustDown-polled): a tap that goes down and up inside
-    // one frame would otherwise be swallowed by Key.onUp clearing _justDown
-    kb.on("keydown-Z", () => this.tryUseMove(0));
-    kb.on("keydown-Q", () => this.tryUseMove(0));
-    kb.on("keydown-X", () => this.tryUseMove(1));
-    kb.on("keydown-E", () => this.tryUseMove(1));
-    kb.on("keydown-P", () => this.pauseGame());
-    kb.on("keydown-ESC", () => this.pauseGame());
+    const binds = Save.binds();
+    this.actionKeys = {} as Record<Action, Phaser.Input.Keyboard.Key[]>;
+    for (const action of Object.keys(binds) as Action[]) {
+      this.actionKeys[action] = binds[action].map((code) => kb.addKey(code));
+    }
+    // one-shot actions go through a single keydown dispatcher: a tap that goes
+    // down and up inside one frame would be missed by JustDown polling
+    const discrete = new Map<number, () => void>();
+    for (const code of binds.item) discrete.set(code, () => this.tryUseItem());
+    for (const code of binds.move1) discrete.set(code, () => this.tryUseMove(0));
+    for (const code of binds.move2) discrete.set(code, () => this.tryUseMove(1));
+    for (const code of binds.pause) discrete.set(code, () => this.pauseGame());
+    kb.on("keydown", (e: KeyboardEvent) => {
+      const fn = discrete.get(e.keyCode);
+      if (fn) fn();
+    });
+    // fixed utility keys (not remappable)
     kb.on("keydown-M", () => Audio.toggleMute());
     kb.on("keydown-C", () => this.cycleView());
     kb.on("keydown-V", () => this.cycleCamera());
@@ -508,7 +506,7 @@ export default class RaceScene extends Phaser.Scene {
     this.countdownT -= dt;
 
     // track rocket-start timing
-    const throttleDown = this.keys.up.isDown || this.keys.w.isDown || !!this.playerAuto;
+    const throttleDown = this.down("accel") || !!this.playerAuto;
     if (throttleDown) {
       if (this.holdStart < 0) this.holdStart = this.countdownT;
     } else {
@@ -540,11 +538,18 @@ export default class RaceScene extends Phaser.Scene {
     }
   }
 
+  /** True when any key bound to an action is held. */
+  private down(action: Action): boolean {
+    const keys = this.actionKeys[action];
+    return keys ? keys.some((k) => k.isDown) : false;
+  }
+
   private gatherPlayerInput() {
     const p = this.player;
     if (this.playerAuto) {
-      if (Phaser.Input.Keyboard.JustDown(this.keys.shift)) this.tryUseItem();
-      else if (Math.random() < 0.004 && p.item) this.tryUseItem();
+      // item/move keypresses for the demo pilot are handled by the keydown
+      // dispatcher; sprinkle in autonomous item/move use too
+      if (Math.random() < 0.004 && p.item) this.tryUseItem();
       if (Math.random() < 0.008) this.moves.tryUse(p, Math.random() < 0.5 ? 0 : 1);
       return;
     }
@@ -554,12 +559,11 @@ export default class RaceScene extends Phaser.Scene {
       p.input.drift = false;
       return;
     }
-    const k = this.keys;
-    p.input.throttle = k.up.isDown || k.w.isDown ? 1 : 0;
-    p.input.brake = k.down.isDown || k.s.isDown;
-    p.input.steer = (k.left.isDown || k.a.isDown ? -1 : 0) + (k.right.isDown || k.d.isDown ? 1 : 0);
-    p.input.drift = k.space.isDown;
-    if (Phaser.Input.Keyboard.JustDown(k.shift)) this.tryUseItem();
+    p.input.throttle = this.down("accel") ? 1 : 0;
+    p.input.brake = this.down("brake");
+    p.input.steer = (this.down("left") ? -1 : 0) + (this.down("right") ? 1 : 0);
+    p.input.drift = this.down("drift");
+    // item use is fired by the keydown dispatcher set up in create()
   }
 
   private tryUseMove(slot: number) {

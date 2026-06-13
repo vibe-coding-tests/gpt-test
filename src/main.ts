@@ -11,6 +11,8 @@ import HudScene from "./scenes/HudScene";
 import PauseScene from "./scenes/PauseScene";
 import ResultsScene from "./scenes/ResultsScene";
 import CheatsScene from "./scenes/CheatsScene";
+import ControlsScene from "./scenes/ControlsScene";
+import { Save } from "./systems/SaveSystem";
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,
@@ -36,11 +38,13 @@ const game = new Phaser.Game({
     HudScene,
     PauseScene,
     ResultsScene,
-    CheatsScene
+    CheatsScene,
+    ControlsScene
   ]
 });
 
-// dev hook (useful for debugging from the console)
+// dev hooks (useful for debugging from the console + e2e tests)
 (window as unknown as { __game: Phaser.Game }).__game = game;
+(window as unknown as { __save: typeof Save }).__save = Save;
 
 Audio.installAutoUnlock();

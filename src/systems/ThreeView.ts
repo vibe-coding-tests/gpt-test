@@ -9,15 +9,14 @@ import { buildMonRig, type MonRig } from "./monmodel";
 import { getPokemon } from "../data/pokemonData";
 import { clamp, rotLerp } from "../util";
 
-export type ViewMode = "m7" | "rotate" | "north";
+export type ViewMode = "m7" | "rotate";
 
 export const VIEW_LABELS: Record<ViewMode, string> = {
   m7: "CAMERA: CHASE 3D",
-  rotate: "CAMERA: TOP (ROTATE)",
-  north: "CAMERA: TOP (NORTH-UP)"
+  rotate: "CAMERA: TOP-DOWN"
 };
 
-export const VIEW_CYCLE: ViewMode[] = ["m7", "rotate", "north"];
+export const VIEW_CYCLE: ViewMode[] = ["m7", "rotate"];
 
 /** Anything we can place per frame. */
 type Bill =
