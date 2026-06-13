@@ -21,7 +21,13 @@ npm --version
 
 ## 2. Get the project
 
-Either clone it with git, or copy/unzip the `pokekart` folder onto the PC.
+Clone it with git:
+
+```powershell
+git clone https://github.com/char-boomer-remakes/pokekart.git
+```
+
+Or copy/unzip the `pokekart` folder onto the PC.
 
 ## 3. Install and run
 

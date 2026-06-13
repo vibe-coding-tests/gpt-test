@@ -16,6 +16,8 @@ assets, no backend. Progress saves to `localStorage`.
 ## Run it
 
 ```bash
+git clone https://github.com/char-boomer-remakes/pokekart.git
+cd pokekart
 npm install
 npm run dev
 ```
