@@ -1,9 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 const PORT = 5181;
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "./tests",
+  testMatch: "**/*.spec.ts",
   fullyParallel: false,
   workers: 1,
   // software WebGL (swiftshader) is CPU-bound; a slow boot can occasionally
@@ -23,6 +25,7 @@ export default defineConfig({
         // Three.js needs a working WebGL context; force software GL so the
         // 3D world renders even on a headless CI box with no real GPU.
         launchOptions: {
+          executablePath: chromiumExecutablePath,
           args: [
             "--use-gl=angle",
             "--use-angle=swiftshader",

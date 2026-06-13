@@ -22,7 +22,7 @@ export default class BootScene extends Phaser.Scene {
       GameState.demo = q.has("demo");
       const species = GameState.demo ? ALL_IDS[Math.floor(Math.random() * ALL_IDS.length)] : 25;
       startBattle(id, species);
-      this.scene.start("Race");
+      this.scene.start("Loading");
       return;
     }
     if (q.has("demo")) {
@@ -32,14 +32,14 @@ export default class BootScene extends Phaser.Scene {
       const species = ALL_IDS[Math.floor(Math.random() * ALL_IDS.length)];
       if (TRACKS[trackId].arena) {
         startBattle(trackId, species);
-        this.scene.start("Race");
+        this.scene.start("Loading");
         return;
       }
       const cupId = CUPS.findIndex((c) => c.trackIds.includes(trackId));
       startGp(Math.max(0, cupId), species);
       GameState.gp!.raceIndex = CUPS[Math.max(0, cupId)].trackIds.indexOf(trackId);
       GameState.trackId = trackId;
-      this.scene.start("Race");
+      this.scene.start("Loading");
       return;
     }
     if (q.has("race")) {
@@ -48,12 +48,12 @@ export default class BootScene extends Phaser.Scene {
       startGp(cupId, 25);
       GameState.gp!.raceIndex = CUPS[cupId].trackIds.indexOf(trackId);
       GameState.trackId = trackId;
-      this.scene.start("Race");
+      this.scene.start("Loading");
       return;
     }
     if (q.has("tt")) {
       startTimeTrial(Math.min(11, Math.max(0, parseInt(q.get("tt") ?? "0", 10) || 0)), 25);
-      this.scene.start("Race");
+      this.scene.start("Loading");
       return;
     }
     this.scene.start("Title");

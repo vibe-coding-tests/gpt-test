@@ -935,6 +935,22 @@ export class ThreeView {
     this.renderer.render(this.scene3, this.camera);
   }
 
+  stats() {
+    let rigs = 0;
+    let visibleBills = 0;
+    for (const b of this.bills.values()) {
+      if (b.obj.visible) visibleBills++;
+      if (b.kind === "rig" && b.obj.visible) rigs++;
+    }
+    return {
+      calls: this.renderer.info.render.calls,
+      triangles: this.renderer.info.render.triangles,
+      bills: visibleBills,
+      rigs,
+      particles: this.particles.length
+    };
+  }
+
   destroy() {
     for (const [go, b] of [...this.bills]) this.dropBill(go, b);
     for (const p of this.particles) p.spr.visible = false;

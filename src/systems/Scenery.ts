@@ -142,12 +142,20 @@ export class Scenery {
       });
     }
 
-    // checkered flags flanking the start line
+    // checkered flags flanking the start line — find an offset on each side
+    // that clears every stretch of road (the start can sit near a return leg)
+    const startP = geom.sample(0.0015);
     for (const side of [-1, 1]) {
-      const p = geom.sample(0.0015);
-      const d = side * (def.corridorHalf + 26);
-      const img = scene.add.image(p.x + p.nx * d, p.y + p.ny * d, "sc-flag").setOrigin(0.5, 1).setDepth(2.8);
-      this.props.push({ img, x: p.x + p.nx * d, y: p.y + p.ny * d, scale: 2.1, sway: 0.04, phase: side });
+      let fx = 0, fy = 0, ok = false;
+      for (const off of [26, 16, 40, 64]) {
+        const d = side * (def.corridorHalf + off);
+        fx = startP.x + startP.nx * d;
+        fy = startP.y + startP.ny * d;
+        if (!geom.onCourse(fx, fy, 6)) { ok = true; break; }
+      }
+      if (!ok) continue;
+      const img = scene.add.image(fx, fy, "sc-flag").setOrigin(0.5, 1).setDepth(2.8);
+      this.props.push({ img, x: fx, y: fy, scale: 2.1, sway: 0.04, phase: side });
     }
 
     this.placeCrowd(rng);
@@ -189,6 +197,9 @@ export class Scenery {
         const p = this.geom.sample(wrapS(along));
         const x = p.x + p.nx * d, y = p.y + p.ny * d;
         if (x < 30 || y < 30 || x > this.geom.worldW - 30 || y > this.geom.worldH - 30) continue;
+        // bleachers hug the corridor edge; reject any that a nearby return leg
+        // would otherwise drop into the middle of the road
+        if (this.geom.onCourse(x, y, 8)) continue;
         const img = this.scene.add.image(x, y, `sc-trainer${Math.floor(rng.range(0, 6))}`)
           .setOrigin(0.5, 1).setDepth(2.85);
         this.crowd.push({

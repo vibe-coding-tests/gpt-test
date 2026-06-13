@@ -17,8 +17,22 @@ export interface RacerInput {
   useItem: boolean;
 }
 
-const SLIP_ANGLE: Record<string, number> = {
-  runner: 0.3, flyer: 0.46, floater: 0.52, swimmer: 0.4, heavy: 0.28
+/**
+ * Per-class drift identity. Low-grip classes (floater/flyer) used to be punished
+ * for drifting — now they're the specialists: they slide wider but charge the
+ * mini-turbo fastest, so a long committed slide is *their* game. Runners get
+ * quick, tidy turbos; heavies barely slide and charge slowest, but their mass
+ * already carries the corner.
+ *   slip   — how far the slide kicks the nose out (radians)
+ *   charge — multiplier on how fast the mini-turbo builds
+ *   turn   — base authority of the drift's pull toward the corner
+ */
+const DRIFT_PROFILE: Record<string, { slip: number; charge: number; turn: number }> = {
+  runner: { slip: 0.34, charge: 1.15, turn: 1.0 },
+  flyer: { slip: 0.5, charge: 1.2, turn: 0.82 },
+  floater: { slip: 0.56, charge: 1.3, turn: 0.92 },
+  swimmer: { slip: 0.42, charge: 1.0, turn: 0.9 },
+  heavy: { slip: 0.3, charge: 0.82, turn: 0.74 }
 };
 
 /**
@@ -34,8 +48,11 @@ const SLOPE_FACTOR: Record<string, { up: number; down: number }> = {
   heavy: { up: 1.3, down: 1.45 }
 };
 
-export const DRIFT_TIERS = [0.8, 1.7, 2.7];
+export const DRIFT_TIERS = [0.55, 1.3, 2.2];
 export const DRIFT_COLORS = [0x66ccff, 0xffaa33, 0xd06aff];
+
+/** Reserve ceiling: chained drift boosts stack up to this many seconds. */
+const DRIFT_BOOST_CAP = 3.5;
 
 /**
  * Checkpoints a lap must clear before the finish line will count it. Buckets are
@@ -69,6 +86,9 @@ export class Racer {
   driftDir = 0;
   driftCharge = 0;
   driftTier = 0;
+  driftChain = 0;            // consecutive drift releases — CTR-style reserve
+  driftChainT = 0;           // window the chain stays alive between slides
+  private driftPerfectT = 0; // brief clean-release window after a tier locks in
   hopT = 0;
 
   boostT = 0;
@@ -257,6 +277,7 @@ export class Racer {
         mercy = this.status.spin + 1.8;
         this.vx *= 0.5; this.vy *= 0.5;
         this.drifting = false; this.driftCharge = 0; this.driftTier = 0;
+        this.driftChain = 0; this.driftChainT = 0;
         Audio.sfx("hit");
         burst(this.scene, this.x, this.y, { color: 0xffe066, n: 8, spd: 110 });
         break;
@@ -421,6 +442,7 @@ export class Racer {
     this.fallT = 0.6; // quick tumble — arcade racers get you back fast
     this.drifting = false;
     this.driftCharge = 0; this.driftTier = 0;
+    this.driftChain = 0; this.driftChainT = 0;
     this.transform = null; this.transformT = 0;
     this.slamPending = null;
     Audio.sfx("fall");
@@ -561,16 +583,40 @@ export class Racer {
   releaseDrift() {
     if (this.driftTier > 0) {
       const tier = this.driftTier;
-      this.applyBoost(
-        [1.22, 1.3, 1.4][tier - 1],
-        [0.55, 0.9, 1.3][tier - 1],
-        ["boost1", "boost2", "boost3"][tier - 1]
-      );
-      this.gainEnergy([10, 16, 24][tier - 1]);
+      const mult = [1.3, 1.4, 1.5][tier - 1];
+      let dur = [0.7, 1.4, 2.2][tier - 1];
+      // perfect release: let go on the beat a tier locks in for a clean bonus
+      const perfect = this.driftPerfectT > 0;
+      if (perfect) dur += 0.12 * tier;
+
+      // CTR-style reserve: drifts chained inside the window stack boost time
+      // (up to a cap) instead of replacing it, so good cornering compounds into
+      // sustained speed rather than resetting every slide
+      if (this.driftChainT > 0) {
+        this.driftChain++;
+        this.boostT = Math.min(this.boostT + dur, DRIFT_BOOST_CAP);
+        this.boostMult = Math.max(this.boostMult, mult);
+        Audio.sfx(["boost1", "boost2", "boost3"][tier - 1]);
+      } else {
+        this.driftChain = 1;
+        this.applyBoost(mult, dur, ["boost1", "boost2", "boost3"][tier - 1]);
+      }
+      this.driftChainT = 1.2; // hold the chain window open for the next corner
+      this.gainEnergy([12, 20, 30][tier - 1] + (perfect ? 6 : 0));
+
+      ringPulse(this.scene, this.x, this.y, DRIFT_COLORS[tier - 1], 64 + tier * 14);
+      if (this.isPlayer) {
+        if (perfect) floatText(this.scene, this.x, this.y - 42, "PERFECT!", "#ffe9a0", 15);
+        if (this.driftChain >= 2) {
+          floatText(this.scene, this.x, this.y - 58, `CHAIN x${this.driftChain}`, "#d8a0ff", 14);
+          this.hudToast(`DRIFT CHAIN x${this.driftChain}!`, "#d8a0ff");
+        }
+      }
     }
     this.drifting = false;
     this.driftCharge = 0;
     this.driftTier = 0;
+    this.driftPerfectT = 0;
   }
 
   /** Spot just behind the racer (feet / tail / wake) for spark effects. */
@@ -591,6 +637,11 @@ export class Racer {
     this.bumpCd = Math.max(0, this.bumpCd - dt);
     this.hopT = Math.max(0, this.hopT - dt);
     this.agilityFxT = Math.max(0, this.agilityFxT - dt);
+    if (this.driftChainT > 0) {
+      this.driftChainT -= dt;
+      if (this.driftChainT <= 0) this.driftChain = 0;
+    }
+    this.driftPerfectT = Math.max(0, this.driftPerfectT - dt);
     if (this.boostT > 0) {
       this.boostT -= dt;
       if (this.boostT <= 0) this.boostMult = 1;
@@ -661,21 +712,37 @@ export class Racer {
     const onGround = this.airT <= 0;
 
     // --- drift / hop ---
-    if (driftHeld && !this.drifting && onGround && this.speed > 130 && Math.abs(steer) > 0.25) {
+    if (driftHeld && !this.drifting && onGround && this.speed > 110 && Math.abs(steer) > 0.2) {
       this.drifting = true;
       this.driftDir = Math.sign(steer);
       this.driftCharge = 0;
       this.driftTier = 0;
+      this.driftPerfectT = 0;
       this.hopT = 0.18;
     }
     if (this.drifting) {
-      if (!driftHeld || this.speed < 90 || stunned) {
+      if (stunned) {
+        // a hit kills the slide cold: no payoff, and the chain breaks
+        this.drifting = false;
+        this.driftCharge = 0;
+        this.driftTier = 0;
+        this.driftPerfectT = 0;
+        this.driftChain = 0;
+        this.driftChainT = 0;
+      } else if (!driftHeld || this.speed < 60) {
         this.releaseDrift();
       } else {
-        this.driftCharge += dt * (1 + Math.abs(steer) * 0.6);
-        const newTier = this.driftCharge >= DRIFT_TIERS[2] ? 3 : this.driftCharge >= DRIFT_TIERS[1] ? 2 : this.driftCharge >= DRIFT_TIERS[0] ? 1 : 0;
+        // soft-drift: holding the line into the corner charges fastest, and each
+        // movement class builds at its own rate (floaters/flyers are specialists)
+        const dp = DRIFT_PROFILE[this.def.cls];
+        const align = clamp(steer * this.driftDir, -1, 1);
+        this.driftCharge += dt * (0.72 + Math.max(align, 0) * 0.6) * dp.charge;
+        const newTier = this.driftCharge >= DRIFT_TIERS[2] ? 3
+          : this.driftCharge >= DRIFT_TIERS[1] ? 2
+            : this.driftCharge >= DRIFT_TIERS[0] ? 1 : 0;
         if (newTier > this.driftTier) {
           this.driftTier = newTier;
+          this.driftPerfectT = 0.26; // brief window for a clean-release bonus
           if (this.isPlayer) Audio.sfx("drifttick");
         }
       }
@@ -694,8 +761,13 @@ export class Racer {
       * (this.status.paralysis > 0 ? 0.62 : 1)
       * (iceSlick ? 0.6 : 1);
     if (this.drifting) {
-      const align = steerFx * this.driftDir;
-      this.heading += this.driftDir * steerRate * (0.85 + Math.max(align, 0) * 0.5 + Math.min(align, 0) * 0.35) * dt;
+      const dp = DRIFT_PROFILE[this.def.cls];
+      const align = steerFx * this.driftDir; // + steering into the slide, - counter-steering
+      // counter-steerable drift: steer in to tighten the arc, hold neutral to
+      // sweep through, or counter-steer to stand it up and hold a line (even
+      // slightly unwind it) — so a drift works on gentle bends, not just hairpins
+      const turnFactor = 0.6 + Math.max(align, 0) * 0.75 - Math.max(-align, 0) * 0.8;
+      this.heading += this.driftDir * steerRate * dp.turn * turnFactor * dt;
     } else {
       // generous low-speed steering so you can always turn away from a wall,
       // tapering off near top speed so flat-out driving stays stable —
@@ -743,7 +815,7 @@ export class Racer {
     let accel = this.stats.accel * throttle;
     if (this.status.paralysis > 0) accel *= 0.72;
     if (this.surface === "offroad") accel *= 0.85;
-    const slip = this.drifting ? SLIP_ANGLE[def.cls] * this.driftDir : 0;
+    const slip = this.drifting ? DRIFT_PROFILE[def.cls].slip * this.driftDir : 0;
     const moveDir = this.heading - slip;
     this.vx += Math.cos(moveDir) * accel * dt;
     this.vy += Math.sin(moveDir) * accel * dt;
@@ -1018,8 +1090,8 @@ export class Racer {
     if (this.status.spin > 0) {
       face += (1 - this.status.spin / 0.8) * Math.PI * 4;
     } else if (this.drifting) {
-      face += this.driftDir * 0.3;
-      lean = this.driftDir * 0.3;
+      face += this.driftDir * (0.28 + this.driftTier * 0.05);
+      lean = this.driftDir * (0.3 + this.driftTier * 0.06);
     } else {
       face += this.steerSm * 0.12; // lean into the turn
       lean = this.steerSm * 0.16;

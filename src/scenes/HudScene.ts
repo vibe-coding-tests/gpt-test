@@ -7,6 +7,7 @@ import { clamp, fmtTime, ordinal } from "../util";
 import { ITEM_LIST } from "../data/itemsData";
 import { MOVES } from "../data/movesData";
 import { TYPE_COLORS } from "../data/pokemonData";
+import { DRIFT_TIERS, DRIFT_COLORS } from "../race/Racer";
 
 const POS_COLORS = ["#ffd23a", "#d7deed", "#e09a5e", "#8ecdff", "#8ecdff", "#8ecdff", "#8ecdff", "#8ecdff"];
 
@@ -49,6 +50,8 @@ export default class HudScene extends Phaser.Scene {
   private goShownT = 0;
   private rouletteAcc = 0;
   private rouletteWas = false;
+  private driftTierWas = 0;
+  private driftFlashT = 0;
   private debugText: Phaser.GameObjects.Text | null = null;
 
   constructor() {
@@ -174,7 +177,7 @@ export default class HudScene extends Phaser.Scene {
     this.debugText = null;
     if (Save.cheats.overlay) {
       const bg = this.add.graphics();
-      glass(bg, 18, battle ? 152 : 122, 224, 124, 8);
+      glass(bg, 18, battle ? 152 : 122, 260, 192, 8);
       this.debugText = this.add.text(28, (battle ? 152 : 122) + 8, "", {
         fontFamily: UI.monoFont, fontSize: "12px", color: "#9af89a", lineSpacing: 4
       });
@@ -338,17 +341,24 @@ export default class HudScene extends Phaser.Scene {
     }
     this.statusBox.setAlpha(status ? (Math.sin(Date.now() / 90) > 0 ? 1 : 0.45) : 0);
 
-    this.drawDynamic();
+    this.drawDynamic(dt);
 
     // debug overlay (cheats)
     if (this.debugText) {
       const fps = Math.round(this.game.loop.actualFps);
+      const perf = race.perfStats;
+      const view = race.view.stats();
       this.debugText.setText([
         `fps   ${fps}`,
+        `ms    ${perf.frameMs.toFixed(1)}`,
+        `sim   ${perf.simMs.toFixed(1)}  ren ${perf.renderMs.toFixed(1)}`,
+        `draw  ${view.calls}  tri ${Math.round(view.triangles / 1000)}k`,
+        `obj   ${view.bills}  rig ${view.rigs}  p ${view.particles}`,
         `spd   ${Math.round(p.speed)} / ${Math.round(p.stats.topSpeed)}`,
         `s     ${p.proj.s.toFixed(3)}  d ${Math.round(p.proj.d)}`,
         `surf  ${p.surface}${p.airT > 0 ? " (air)" : ""}`,
         `boost ${Math.max(0, p.boostT).toFixed(2)}  mult ${p.speedMult.toFixed(2)}`,
+        `drift t${p.driftTier} ${p.driftCharge.toFixed(2)}  chain ${p.driftChain}`,
         `rank  ${p.rank}  candies ${p.candies}  stacks ${p.powerStacks}`
       ].join("\n"));
     }
@@ -365,7 +375,7 @@ export default class HudScene extends Phaser.Scene {
   }
 
   /** Per-frame chrome: energy bar, move chips, speed bar, item-card glow. */
-  private drawDynamic() {
+  private drawDynamic(dt: number) {
     const g = this.dynG;
     if (!g) return;
     g.clear();
@@ -391,6 +401,33 @@ export default class HudScene extends Phaser.Scene {
     if (boosting) {
       g.lineStyle(2, 0xffe066, 0.5 + Math.sin(Date.now() / 50) * 0.3)
         .strokeRoundedRect(sx - 4, sy - 4, sw + 8, sh + 8, (sh + 8) / 2);
+    }
+
+    // ---- drift charge meter (just above the speed bar) ----
+    if (p.driftTier > this.driftTierWas) this.driftFlashT = 0.3;
+    this.driftTierWas = p.drifting ? p.driftTier : 0;
+    this.driftFlashT = Math.max(0, this.driftFlashT - dt);
+    if (p.drifting || this.driftFlashT > 0) {
+      const maxC = DRIFT_TIERS[2];
+      const cfrac = clamp(p.driftCharge / maxC, 0, 1);
+      const tierCol = p.driftTier > 0 ? DRIFT_COLORS[p.driftTier - 1] : 0x8ecdff;
+      const dw = 220, dh = 7, dx = GAME_W / 2 - dw / 2, dy = sy - 16;
+      g.fillStyle(0x0b0e1f, 0.5).fillRoundedRect(dx - 4, dy - 4, dw + 8, dh + 8, (dh + 8) / 2);
+      g.fillStyle(0x141a36, 1).fillRoundedRect(dx, dy, dw, dh, dh / 2);
+      if (cfrac > 0.02) {
+        g.fillStyle(tierCol, 1).fillRoundedRect(dx, dy, Math.max(dh, dw * cfrac), dh, dh / 2);
+      }
+      // tier boundary ticks
+      g.fillStyle(0xffffff, 0.35);
+      for (let i = 0; i < 2; i++) {
+        g.fillRect(dx + dw * (DRIFT_TIERS[i] / maxC) - 1, dy, 2, dh);
+      }
+      // pulse on tier-up; steady shimmer once maxed
+      const flash = this.driftFlashT > 0 ? this.driftFlashT / 0.3 : 0;
+      if (flash > 0 || p.driftTier >= 3) {
+        const a = p.driftTier >= 3 ? 0.4 + Math.sin(Date.now() / 60) * 0.3 : flash * 0.85;
+        g.lineStyle(2, tierCol, a).strokeRoundedRect(dx - 4, dy - 4, dw + 8, dh + 8, (dh + 8) / 2);
+      }
     }
 
     // ---- signature moves: energy bar + the equipped Z / X chips ----

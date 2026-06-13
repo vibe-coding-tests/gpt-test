@@ -65,6 +65,8 @@ export default class RaceScene extends Phaser.Scene {
   private speedFX!: SpeedFX;
   private speedK = 0; // smoothed 0..1 rush factor for FOV + speed lines
   private world!: TrackWorld;
+  perfStats = { frameMs: 0, simMs: 0, renderMs: 0 };
+  private firstFrameDone = false; // tells the loading curtain when to lift
 
   // remappable controls: each action maps to one or two Phaser keys
   private actionKeys!: Record<Action, Phaser.Input.Keyboard.Key[]>;
@@ -90,6 +92,7 @@ export default class RaceScene extends Phaser.Scene {
     this.holdStart = -1;
     this.prevRank = -1;
     this.rankBlipCd = 0;
+    this.firstFrameDone = false;
     this.isBattle = GameState.mode === "battle";
     this.battleTimer = 180;
     this.prevAlive = 0;
@@ -307,6 +310,7 @@ export default class RaceScene extends Phaser.Scene {
   // ---------------- main loop ----------------
 
   update(_: number, deltaMs: number) {
+    const frameStart = performance.now();
     const dt = clamp(deltaMs, 1, 50) / 1000;
 
     if (!this.raceStarted) {
@@ -398,9 +402,26 @@ export default class RaceScene extends Phaser.Scene {
     this.speedK += (rushTarget - this.speedK) * Math.min(1, dt * 4.5);
     this.view.setSpeed(this.speedK);
     this.speedFX.update(dt, this.view, this.speedK, p.boostT > 0);
+    const renderStart = performance.now();
     this.view.update(dt); // animate rigs + particles, render the 3D frame
+    const renderEnd = performance.now();
     if (this.isBattle) this.checkBattleEnd(dt);
     else this.checkRaceEnd(dt);
+
+    const frameMs = performance.now() - frameStart;
+    const simMs = renderStart - frameStart;
+    const renderMs = renderEnd - renderStart;
+    const k = 0.08;
+    this.perfStats.frameMs += (frameMs - this.perfStats.frameMs) * k;
+    this.perfStats.simMs += (simMs - this.perfStats.simMs) * k;
+    this.perfStats.renderMs += (renderMs - this.perfStats.renderMs) * k;
+
+    // the 3D frame has now been built and drawn at least once — let the loading
+    // curtain lift, revealing a race that's already rendering
+    if (!this.firstFrameDone) {
+      this.firstFrameDone = true;
+      this.registry.set("raceReady", true);
+    }
   }
 
   // ---------------- battle mode ----------------

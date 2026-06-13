@@ -108,7 +108,7 @@ export default class PauseScene extends Phaser.Scene {
     this.scene.stop("Hud");
     this.scene.stop("Race");
     this.scene.stop();
-    this.scene.start("Race");
+    this.scene.start("Loading");
   }
 
   private exitTo(key: string, data?: object) {

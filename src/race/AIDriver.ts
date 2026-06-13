@@ -149,14 +149,20 @@ export class AIDriver {
     const nearRim = def.edgeMode === "fall" && Math.abs(r.proj.d) > def.roadHalf * 0.55;
     let drift: boolean;
     if (r.drifting) {
-      drift = !(r.driftTier >= 3 || (r.driftTier >= 1 && Math.abs(err) < 0.13));
+      // hold for the big tiers, then bail as the corner straightens so the boost
+      // fires down the next straight — the chain window then catches the
+      // following bend, building a reserve the way a skilled human would
+      const straightening = Math.abs(err) < 0.12;
+      drift = !(r.driftTier >= 3
+        || (r.driftTier >= 2 && straightening)
+        || (r.driftTier >= 1 && Math.abs(err) < 0.06));
     } else {
-      if (!nearRim && curv > 0.55 && Math.abs(err) > 0.32 && sp > r.stats.topSpeed * 0.68 && r.airT <= 0) {
+      if (!nearRim && curv > 0.5 && Math.abs(err) > 0.3 && sp > r.stats.topSpeed * 0.66 && r.airT <= 0) {
         this.driftHoldT += dt;
       } else {
         this.driftHoldT = 0;
       }
-      drift = this.driftHoldT > 0.22;
+      drift = this.driftHoldT > 0.18;
     }
 
     // stuck recovery

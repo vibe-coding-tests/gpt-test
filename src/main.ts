@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { GAME_W, GAME_H } from "./constants";
 import { Audio } from "./systems/AudioSystem";
 import BootScene from "./scenes/BootScene";
+import LoadingScene from "./scenes/LoadingScene";
 import TitleScene from "./scenes/TitleScene";
 import MenuScene from "./scenes/MenuScene";
 import PokedexScene from "./scenes/PokedexScene";
@@ -30,6 +31,7 @@ const game = new Phaser.Game({
   },
   scene: [
     BootScene,
+    LoadingScene,
     TitleScene,
     MenuScene,
     PokedexScene,

@@ -40,7 +40,7 @@ Handy dev URLs:
 | --- | --- |
 | ↑ / ↓ | accelerate / brake (WASD also works) |
 | ← / → | steer |
-| SPACE (hold) | hop into a drift — sparks go blue → orange → purple, release for bigger boosts |
+| SPACE (hold) | hop into a drift, then steer through the corner — sparks go blue → orange → purple; release for a boost, and chain drifts to stack speed |
 | SHIFT | use item (3× Agility charges in Time Trial) |
 | Z / X (or Q / E) | fire signature move slot 1 / 2 — costs energy from the meter |
 | P or ESC | pause menu — resume, restart, switch racer, or quit from any race |
@@ -135,7 +135,11 @@ UNLOCKED** the moment one opens. AI rivals fight back with the same system.
 ### Racing mechanics
 
 - Race-start countdown with rocket-start timing (hold ↑ right as GO! flashes)
-- Drift mini-turbos (3 tiers), slipstream draft boosts
+- Drift mini-turbos (3 tiers) you steer through and counter-steer to hold a
+  line; chain slides to stack a reserve of boost, with a perfect-release bonus
+  for letting go right as a tier locks in. Each movement class drifts its own
+  way — floaters and flyers charge fastest, heavies slide least. Plus
+  slipstream draft boosts
 - 14 items, all Pokémon moves, weighted by position — and rubber-banded by
   gap: fall far behind the leader and your rolls come from one or two
   positions further back than you really are, so the pack always has a way

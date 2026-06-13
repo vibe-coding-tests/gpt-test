@@ -250,14 +250,14 @@ export default class SelectScene extends Phaser.Scene {
       }
       startGp(this.listCursor, GameState.playerSpeciesId);
       Audio.stopBgm();
-      this.scene.start("Race");
+      this.scene.start("Loading");
       return;
     }
     const picked = this.trackList()[this.listCursor];
     if (this.flow === "battle") startBattle(picked.id, GameState.playerSpeciesId);
     else startTimeTrial(picked.id, GameState.playerSpeciesId);
     Audio.stopBgm();
-    this.scene.start("Race");
+    this.scene.start("Loading");
   }
 
   /** Swap the scene between its phases, fixing panels / title / grid visibility. */

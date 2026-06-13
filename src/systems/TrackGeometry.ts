@@ -265,6 +265,18 @@ export class TrackGeometry {
     return Math.abs(p.d) <= this.def.roadHalf ? "road" : "offroad";
   }
 
+  /**
+   * True when world point (x, y) sits on (or within `pad` px of) the raceable
+   * corridor of ANY stretch of the course — not just the segment a prop was
+   * offset from. Off-track decorations/props test this so the loop doubling
+   * back on itself (hairpins, switchbacks) can't strand them on a neighbouring
+   * road. project() always snaps to the nearest centerline, so a small |d| here
+   * means some part of the course is right there.
+   */
+  onCourse(x: number, y: number, pad = 0): boolean {
+    return Math.abs(this.project(x, y).d) <= this.def.corridorHalf + pad;
+  }
+
   nearestSafeSpot(s: number, preferredD = 0, opts: SafeSpotOpts = {}): SafeSpot | null {
     const margin = opts.margin ?? 18;
     const half = Math.max(0, (opts.roadOnly ? this.def.roadHalf : this.def.corridorHalf) - margin);

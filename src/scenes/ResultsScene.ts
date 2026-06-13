@@ -240,7 +240,7 @@ export default class ResultsScene extends Phaser.Scene {
       return;
     }
     if (d.mode === "tt" || d.mode === "battle") {
-      this.scene.start("Race"); // retry / rematch, GameState unchanged
+      this.scene.start("Loading"); // retry / rematch, GameState unchanged
       return;
     }
     if (d.isFinalRace) {
@@ -250,7 +250,7 @@ export default class ResultsScene extends Phaser.Scene {
       return;
     }
     gpAdvance();
-    this.scene.start("Race");
+    this.scene.start("Loading");
   }
 
   private drawPodium() {

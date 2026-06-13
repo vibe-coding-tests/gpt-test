@@ -482,12 +482,21 @@ function drawDecorations(g: D2, geom: TrackGeometry, rng: Rng) {
   const count = deco === "forest" ? 240 : deco === "city" ? 90 : deco === "ghost" ? 200 : deco === "plant" ? 110 : 150;
 
   for (let i = 0; i < count; i++) {
-    const k = rng.int(N);
-    const side = rng.next() < 0.5 ? -1 : 1;
-    const d = side * (def.corridorHalf + rng.range(50, 230));
-    const x = geom.xs[k] + geom.nx[k] * d;
-    const y = geom.ys[k] + geom.ny[k] * d;
-    if (x < 20 || y < 20 || x > geom.worldW - 20 || y > geom.worldH - 20) continue;
+    let x = 0, y = 0, placed = false;
+    // a few tries to land clear of EVERY stretch of road: the raw offset can
+    // reach across a hairpin onto a neighbouring segment, painting scenery on
+    // the track. onCourse() rejects any spot sitting on another road.
+    for (let attempt = 0; attempt < 5 && !placed; attempt++) {
+      const k = rng.int(N);
+      const side = rng.next() < 0.5 ? -1 : 1;
+      const d = side * (def.corridorHalf + rng.range(50, 230));
+      x = geom.xs[k] + geom.nx[k] * d;
+      y = geom.ys[k] + geom.ny[k] * d;
+      if (x < 20 || y < 20 || x > geom.worldW - 20 || y > geom.worldH - 20) continue;
+      if (geom.onCourse(x, y, 24)) continue;
+      placed = true;
+    }
+    if (!placed) continue;
 
     switch (deco) {
       case "forest": {
