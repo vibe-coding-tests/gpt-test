@@ -23,6 +23,8 @@ npm run dev
 Your browser opens to http://localhost:5173 automatically (set
 `server.open` in `vite.config.ts` to `false` if you'd rather it didn't).
 
+On Windows? See [WINDOWS.md](WINDOWS.md) for a step-by-step setup guide.
+
 Handy dev URLs:
 
 - `http://localhost:5173/?demo=1&track=4` — AI-driven attract mode on any track (0–11)

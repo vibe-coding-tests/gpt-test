@@ -33,10 +33,10 @@ const M = (id: string, name: string, type: PokeType, cost: number, cat: MoveCat,
 
 export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   // normal — the universal staples that pad every shallow pool
-  M("quickattack", "Quick Attack", "normal", 30, "dash", "Instant short dash with razor-sharp steering."),
+  M("quickattack", "Quick Attack", "normal", 35, "dash", "Instant short dash with razor-sharp steering."),
   M("swift", "Swift", "normal", 40, "shot", "Homing star — never misses the nearest racer ahead."),
   M("bodyslam", "Body Slam", "normal", 45, "pulse", "Leap and slam down — the shockwave spins anyone nearby."),
-  M("roar", "Roar", "normal", 40, "pulse", "Bellow ahead — racers in the cone flinch, slow and scatter."),
+  M("roar", "Roar", "normal", 35, "pulse", "Bellow ahead — racers in the cone flinch, slow and scatter."),
   // guards — the defensive layer: shields, shells and cleanses
   M("harden", "Harden", "normal", 30, "guard", "Tense up — a tough hide blocks the next hit for a while."),
   M("recover", "Recover", "normal", 35, "guard", "Shrug off every status and surge back up to pace."),
@@ -45,10 +45,10 @@ export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   M("acidarmor", "Acid Armor", "poison", 45, "guard", "Melt into ooze — blocks a hit, poisons anyone who bumps you."),
   // fire
   M("flamecharge", "Flame Charge", "fire", 45, "dash", "Blazing sprint — burns on contact, lava can't touch you."),
-  M("firespin", "Fire Spin", "fire", 50, "zone", "Drop a fire vortex that scorches whoever drives through."),
+  M("firespin", "Fire Spin", "fire", 45, "zone", "Drop a fire vortex that scorches whoever drives through."),
   // water
   M("aquajet", "Aqua Jet", "water", 40, "dash", "Water dash — twice the surge if you fire it on water."),
-  M("raindance", "Rain Dance", "water", 60, "buff", "Summon rain: rivals slip and slow, water types speed up."),
+  M("raindance", "Rain Dance", "water", 55, "buff", "Summon rain: rivals slip and slow, water types speed up."),
   // electric
   M("volttackle", "Volt Tackle", "electric", 50, "dash", "Electric charge — paralyzes everyone you blast through."),
   M("thunderwave", "Thunder Wave", "electric", 35, "pulse", "Crackling arc ahead — paralyzes in a cone."),
@@ -59,14 +59,14 @@ export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   M("iceshard", "Ice Shard", "ice", 35, "shot", "Cheap, fast icicle — a quick freeze for whoever's ahead."),
   M("frostmist", "Frost Mist", "ice", 45, "zone", "Trail a freezing mist that chills your pursuers."),
   // fighting
-  M("machpunch", "Mach Punch", "fighting", 35, "dash", "Lightning lunge — first contact sends them spinning."),
-  M("counter", "Counter", "fighting", 50, "stance", "Brace briefly — the next hit bounces back at the attacker."),
+  M("machpunch", "Mach Punch", "fighting", 40, "dash", "Lightning lunge — first contact sends them spinning."),
+  M("counter", "Counter", "fighting", 40, "stance", "Brace briefly — the next hit bounces back at the attacker."),
   // poison
   M("acidspray", "Acid Spray", "poison", 40, "shot", "Lob a glob that bursts into a lingering acid puddle."),
-  M("sludgewave", "Sludge Wave", "poison", 55, "pulse", "Poison nova — everyone close gets spun and poisoned."),
+  M("sludgewave", "Sludge Wave", "poison", 50, "pulse", "Poison nova — everyone close gets spun and poisoned."),
   // ground
   M("dig", "Dig", "ground", 55, "transform", "Burrow under the track — untouchable, immune to terrain."),
-  M("earthquake", "Earthquake", "ground", 60, "pulse", "Shake the ground — spins every GROUNDED racer near you."),
+  M("earthquake", "Earthquake", "ground", 55, "pulse", "Shake the ground — spins every GROUNDED racer near you."),
   // flying
   M("gust", "Gust", "flying", 35, "pulse", "Wing blast — physically shoves racers ahead of you aside."),
   M("fly", "Fly", "flying", 60, "transform", "Take wing — soar over gaps, hazards and everything else."),
@@ -75,7 +75,7 @@ export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   M("barrier", "Barrier", "psychic", 55, "stance", "Long psychic wall — reflects hits back while it lasts."),
   // bug
   M("stringshot", "String Shot", "bug", 35, "zone", "Web the road behind — victims bog down, drifts unravel."),
-  M("pinmissile", "Pin Missile", "bug", 45, "shot", "Three needle shots in a forward spread."),
+  M("pinmissile", "Pin Missile", "bug", 40, "shot", "Three needle shots in a forward spread."),
   // rock
   M("rockthrow", "Rock Throw", "rock", 40, "shot", "Lob a boulder in an arc — it lands with a flattening thud."),
   M("rockpolish", "Rock Polish", "rock", 45, "buff", "Polish up: a surge of speed and offroad means nothing."),
@@ -84,7 +84,7 @@ export const MOVES: Record<string, MoveDef> = Object.fromEntries([
   M("lick", "Lick", "ghost", 35, "pulse", "Close-range lick — paralyzes them, you steal their pace."),
   // dragon
   M("dragonbreath", "Dragon Breath", "dragon", 45, "pulse", "Searing cone of breath — spins and numbs the pack ahead."),
-  M("dragonrush", "Dragon Rush", "dragon", 55, "dash", "Bulldozing charge — scatter anyone in the way, any size.")
+  M("dragonrush", "Dragon Rush", "dragon", 50, "dash", "Bulldozing charge — scatter anyone in the way, any size.")
 ].map((m) => [m.id, m]));
 
 /** Two signature moves per type, in unlock-priority order. */

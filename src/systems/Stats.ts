@@ -1,18 +1,26 @@
 import type { DerivedStats, PokemonDef, PokeType } from "../types";
 import { clamp } from "../util";
 
+/**
+ * Class bases, retuned for the forgiving-hit + defensive-move meta:
+ * runners lose a hair of handling (drift tiers got cheaper), flyers trade a
+ * touch of top end for steadier steering, floaters and swimmers get a real
+ * pace bump (their niches are situational), and heavies — who lost the most
+ * when getting hit stopped hurting so much — become the momentum class:
+ * highest base speed, slowest wind-up.
+ */
 const CLASS_BASE: Record<string, { sp: number; ac: number; hd: number; wt: number }> = {
-  runner: { sp: 0.78, ac: 0.85, hd: 0.85, wt: 0.35 },
-  flyer: { sp: 0.82, ac: 0.7, hd: 0.58, wt: 0.4 },
-  floater: { sp: 0.72, ac: 0.78, hd: 0.68, wt: 0.3 },
-  swimmer: { sp: 0.7, ac: 0.68, hd: 0.72, wt: 0.45 },
-  heavy: { sp: 0.68, ac: 0.55, hd: 0.6, wt: 0.95 }
+  runner: { sp: 0.78, ac: 0.85, hd: 0.82, wt: 0.35 },
+  flyer: { sp: 0.8, ac: 0.7, hd: 0.62, wt: 0.4 },
+  floater: { sp: 0.75, ac: 0.78, hd: 0.7, wt: 0.3 },
+  swimmer: { sp: 0.73, ac: 0.72, hd: 0.72, wt: 0.45 },
+  heavy: { sp: 0.72, ac: 0.52, hd: 0.6, wt: 0.95 }
 };
 
 const TYPE_MODS: Partial<Record<PokeType, Partial<Record<"sp" | "ac" | "hd" | "wt", number>>>> = {
   fire: { sp: 0.07 },
   flying: { sp: 0.05, hd: 0.02 },
-  electric: { sp: 0.04, ac: 0.08 },
+  electric: { sp: 0.04, ac: 0.07 },
   dragon: { sp: 0.06, wt: 0.08 },
   water: { sp: 0.02 },
   normal: { sp: 0.02, ac: 0.02 },
@@ -21,8 +29,8 @@ const TYPE_MODS: Partial<Record<PokeType, Partial<Record<"sp" | "ac" | "hd" | "w
   psychic: { hd: 0.06, ac: 0.03 },
   ghost: { hd: 0.04, wt: -0.12 },
   grass: { hd: 0.03 },
-  ice: { hd: -0.04, wt: 0.06 },
-  rock: { wt: 0.22, sp: -0.04 },
+  ice: { hd: -0.02, wt: 0.06 },
+  rock: { wt: 0.22, sp: -0.02 },
   ground: { wt: 0.12 },
   poison: { wt: 0.02 }
 };
@@ -49,7 +57,7 @@ export function deriveStats(def: PokemonDef): DerivedStats {
   if (def.legendary) { sp += 0.05; ac += 0.04; }
 
   // Pre-evolutions are weaker; collecting Rare Candies closes the gap.
-  const stageMult = 1 - 0.07 * def.evosRemaining;
+  const stageMult = 1 - 0.06 * def.evosRemaining;
   sp = sp * stageMult + (def.pow ?? 0);
   ac = ac * stageMult + (def.pow ?? 0) * 0.6;
 
@@ -101,7 +109,7 @@ export function offroadMult(def: PokemonDef, offroadKind: string): number {
   if (def.cls === "flyer") return 0.85;        // hovers above most of it
   if (def.types.includes("grass") && offroadKind === "grass") return 1.06;
   if (def.types.includes("ground") && (offroadKind === "sand" || offroadKind === "rock")) return 0.8;
-  if (def.cls === "heavy") return 0.62;
+  if (def.cls === "heavy") return 0.66; // bulldozes through, slowly
   return 0.55;
 }
 
