@@ -10,9 +10,32 @@ export interface Projection {
   idx: number; // nearest sample index (projection hint)
 }
 
+export interface SafeSpot {
+  x: number;
+  y: number;
+  heading: number;
+  s: number;
+  d: number;
+}
+
+interface SafeSpotOpts {
+  /** Keep the search inside the painted road instead of the whole corridor. */
+  roadOnly?: boolean;
+  /** Keep candidates this far inside the chosen lateral boundary. */
+  margin?: number;
+  /** How far ahead/behind the requested s to search, in world pixels. */
+  sSearchPx?: number;
+  /** Candidate spacing in lateral and longitudinal sweeps. */
+  stepPx?: number;
+  /** Surfaces considered valid. Defaults to solid, non-damaging terrain. */
+  surfaces?: readonly Surface[];
+}
+
 const FEATURE_PRIORITY: Record<string, number> = {
   gap: 9, ramp: 8, boost: 7, lava: 6, water: 5, ice: 4, mud: 3
 };
+
+const DEFAULT_SAFE_SURFACES: readonly Surface[] = ["road", "offroad", "boost", "ramp", "ice", "mud"];
 
 /**
  * Closed-loop Catmull-Rom centerline with arc-length parameterization.
@@ -216,6 +239,12 @@ export class TrackGeometry {
     return null;
   }
 
+  featuresNear(sA: number, sB: number): Feature[] {
+    return this.featuresSorted.filter(
+      (f) => TrackGeometry.inRange(sA, f.s0, f.s1) || TrackGeometry.inRange(sB, f.s0, f.s1)
+    );
+  }
+
   /** True when a guardrail section protects the corridor edge at s. */
   railAt(s: number): boolean {
     const rails = this.def.rails;
@@ -234,6 +263,38 @@ export class TrackGeometry {
     const f = this.featureAtProj(p);
     if (f) return f.kind;
     return Math.abs(p.d) <= this.def.roadHalf ? "road" : "offroad";
+  }
+
+  nearestSafeSpot(s: number, preferredD = 0, opts: SafeSpotOpts = {}): SafeSpot | null {
+    const margin = opts.margin ?? 18;
+    const half = Math.max(0, (opts.roadOnly ? this.def.roadHalf : this.def.corridorHalf) - margin);
+    const step = Math.max(8, opts.stepPx ?? 18);
+    const searchPx = Math.max(0, opts.sSearchPx ?? 260);
+    const safe = new Set(opts.surfaces ?? DEFAULT_SAFE_SURFACES);
+    const wantD = clamp(preferredD, -half, half);
+    const sBase = wrap01(s);
+    const sOffsets = [0];
+    for (let off = step; off <= searchPx; off += step) {
+      sOffsets.push(-off, off);
+    }
+
+    let best: SafeSpot | null = null;
+    let bestScore = Infinity;
+    const steps = Math.max(1, Math.ceil((half * 2) / step));
+    for (const sOffPx of sOffsets) {
+      const ss = wrap01(sBase + sOffPx / this.total);
+      for (let i = 0; i <= steps; i++) {
+        const d = half <= 0 ? 0 : -half + (i / steps) * half * 2;
+        if (!safe.has(this.surfaceAtProj({ s: ss, d, idx: 0 }))) continue;
+        const score = Math.abs(d - wantD) + Math.abs(sOffPx) * 0.35;
+        if (score >= bestScore) continue;
+        const p = this.posOf(ss, d);
+        best = { ...p, s: ss, d };
+        bestScore = score;
+      }
+    }
+
+    return best;
   }
 
   /** Starting grid pose for slot i (0 = front). Row spacing is in pixels so racers never spawn overlapping. */

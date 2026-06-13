@@ -292,6 +292,9 @@ export class ThreeView {
       const fade = clamp(1 - (Math.abs(p.d) - def.corridorHalf - 40) / 260, 0, 1);
       h = this.geom.heightAt(p.s) * fade;
     }
+    if (this.geom.featureAtProj(p)?.kind === "gap") {
+      h -= 520;
+    }
     if (def.edgeMode === "fall") {
       // floating course: the world drops away into the void past the corridor
       const over = Math.abs(p.d) - (def.corridorHalf + 26);

@@ -51,6 +51,7 @@ interface Gastly {
   t: number;
   phase: number;
   hitCd: number;
+  solid: boolean;
   wx: number;
   wy: number;
 }
@@ -152,7 +153,7 @@ export class HazardManager {
       } else if (h.kind === "gastly") {
         const key = ensurePokemonTexture(scene, 92);
         const sprite = scene.add.sprite(0, 0, key, 0).setDepth(6).setScale(1.05).setAlpha(0.8);
-        this.gastlys.push({ sprite, s: h.s ?? 0, t: this.rng.range(0, 6), phase: this.rng.range(0, Math.PI * 2), hitCd: 0, wx: 0, wy: 0 });
+        this.gastlys.push({ sprite, s: h.s ?? 0, t: this.rng.range(0, 6), phase: this.rng.range(0, Math.PI * 2), hitCd: 0, solid: false, wx: 0, wy: 0 });
       } else if (h.kind === "electrode") {
         const p = geom.posOf(h.s ?? 0, h.d ?? 0);
         const key = ensurePokemonTexture(scene, 101);
@@ -408,12 +409,13 @@ export class HazardManager {
       ga.wx = p.x;
       ga.wy = p.y;
       const fade = 0.45 + Math.sin(ga.t * 1.7 + ga.phase) * 0.35; // phases in and out
+      ga.solid = fade > 0.5;
       ga.sprite.setFrame(Math.floor(ga.t * 4) % 3);
       ga.sprite.setAlpha(fade);
       this.view.submit(ga.sprite, ga.wx, ga.wy, {
         lift: 12 + Math.sin(ga.t * 2.4) * 4, scale: 1.05, topDepth: 6
       });
-      if (ga.hitCd <= 0 && fade > 0.5) {
+      if (ga.hitCd <= 0 && ga.solid) {
         for (const r of this.racers) {
           if (r.falling || r.finished || r.status.invuln > 0) continue;
           const dx = r.x - ga.wx, dy = r.y - ga.wy;
@@ -581,7 +583,9 @@ export class HazardManager {
     for (const z of this.birds) {
       if (z.target) pts.push({ x: z.target.x, y: z.target.y, r: 60 });
     }
-    for (const ga of this.gastlys) pts.push({ x: ga.wx, y: ga.wy, r: 26 });
+    for (const ga of this.gastlys) {
+      if (ga.solid) pts.push({ x: ga.wx, y: ga.wy, r: 26 });
+    }
     for (const e of this.electrodes) {
       if (e.state === "idle") pts.push({ x: e.x, y: e.y, r: 34 });
     }

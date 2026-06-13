@@ -15,6 +15,7 @@ const DEG = Math.PI / 180;
 interface Box {
   img: Phaser.GameObjects.Image;
   x: number; y: number;
+  s: number; d: number;
   active: boolean;
   respawnT: number;
   spin: number;
@@ -125,14 +126,45 @@ export class ItemManager {
   }
 
   private spawnBoxes() {
+    const safeSurfaces = ["road", "boost", "ramp", "ice", "mud"] as const;
     for (const sRow of this.geom.def.itemRows) {
+      const occupied: { s: number; d: number }[] = [];
       for (const frac of [-0.66, -0.22, 0.22, 0.66]) {
         const d = frac * this.geom.def.roadHalf;
-        const p = this.geom.posOf(sRow, d);
+        const p = this.findBoxSpot(sRow, d, occupied, safeSurfaces);
+        if (!p) continue;
         const img = this.scene.add.image(p.x, p.y, "fx-box").setDepth(3);
-        this.boxes.push({ img, x: p.x, y: p.y, active: true, respawnT: 0, spin: Math.random() * 6 });
+        this.boxes.push({ img, x: p.x, y: p.y, s: p.s, d: p.d, active: true, respawnT: 0, spin: Math.random() * 6 });
+        occupied.push({ s: p.s, d: p.d });
       }
     }
+  }
+
+  private findBoxSpot(
+    s: number,
+    d: number,
+    occupied: { s: number; d: number }[],
+    safeSurfaces: readonly ("road" | "boost" | "ramp" | "ice" | "mud")[]
+  ) {
+    const roadHalf = this.geom.def.roadHalf;
+    for (let target = d, pass = 0; pass < 3; pass++) {
+      const spot = this.geom.nearestSafeSpot(s, target, {
+        roadOnly: true,
+        margin: 20,
+        sSearchPx: 520,
+        stepPx: 14,
+        surfaces: safeSurfaces
+      });
+      if (!spot) continue;
+      const tooClose = occupied.some((o) => {
+        const ds = Math.abs(spot.s - o.s);
+        const dsPx = Math.min(ds, 1 - ds) * this.geom.total;
+        return Math.hypot(dsPx, spot.d - o.d) < 36;
+      });
+      if (!tooClose) return spot;
+      target = pass === 0 ? Math.sign(d || 1) * roadHalf * 0.9 : -target;
+    }
+    return null;
   }
 
   update(dt: number, raceTime: number) {

@@ -133,9 +133,18 @@ export class BattleAI {
       this.stuckT += dt;
       if (this.stuckT > 2.8) {
         this.stuckT = 0;
-        const p = this.geom.posOf(r.proj.s, 0);
+        const p = this.geom.nearestSafeSpot(r.proj.s, r.proj.d, {
+          roadOnly: true,
+          margin: 24,
+          sSearchPx: 360,
+          stepPx: 16
+        }) ?? this.geom.posOf(r.proj.s, 0);
         r.x = p.x; r.y = p.y;
         r.heading = p.heading;
+        const spd = Math.max(r.speed, r.stats.topSpeed * 0.32);
+        r.vx = Math.cos(r.heading) * spd;
+        r.vy = Math.sin(r.heading) * spd;
+        r.proj = this.geom.project(r.x, r.y);
         r.status.invuln = Math.max(r.status.invuln, 0.6);
       }
     } else {
@@ -203,7 +212,9 @@ export class BattleAI {
 
   private pickScavengeTarget(ctx: AIContext) {
     const r = this.racer;
-    this.hasTarget = false;
+    if (this.hasTarget && Math.hypot(this.targetX - r.x, this.targetY - r.y) < 90) {
+      this.hasTarget = false;
+    }
 
     let bx = 0, by = 0, bestD = Infinity;
     for (const b of this.items.boxes) {

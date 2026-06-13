@@ -444,7 +444,12 @@ export class Racer {
   }
 
   respawn() {
-    const p = this.geom.posOf(this.lastSafeS, 0);
+    const p = this.geom.nearestSafeSpot(this.lastSafeS, this.proj.d, {
+      roadOnly: true,
+      margin: 24,
+      sSearchPx: 420,
+      stepPx: 16
+    }) ?? this.geom.posOf(this.lastSafeS, 0);
     this.x = p.x; this.y = p.y;
     this.heading = p.heading;
     // fast enough to clear a ramp right after the respawn point
@@ -461,7 +466,12 @@ export class Racer {
   }
 
   teleportToS(targetS: number) {
-    const p = this.geom.posOf(targetS, 0);
+    const p = this.geom.nearestSafeSpot(targetS, 0, {
+      roadOnly: true,
+      margin: 24,
+      sSearchPx: 420,
+      stepPx: 16
+    }) ?? this.geom.posOf(targetS, 0);
     this.x = p.x; this.y = p.y;
     this.heading = p.heading;
     const sp = this.stats.topSpeed * 0.8;

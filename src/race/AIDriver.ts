@@ -76,8 +76,7 @@ export class AIDriver {
     const likesWater = cls === "swimmer" || r.def.types.includes("water");
     const checkS = wrap01(sNow + la * 0.9);
     let jumpAhead = false; // mandatory gap jump coming — commit, full speed
-    for (const f of def.features) {
-      if (!TrackGeometry.inRange(checkS, f.s0, f.s1) && !TrackGeometry.inRange(sT, f.s0, f.s1)) continue;
+    for (const f of geom.featuresNear(checkS, sT).reverse()) {
       const leftLane = (-def.roadHalf + f.d0) / 2;
       const rightLane = (f.d1 + def.roadHalf) / 2;
       const leftOk = f.d0 > -def.roadHalf + 36;
@@ -166,9 +165,18 @@ export class AIDriver {
       this.stuckT += dt;
       if (this.stuckT > 2.6) {
         this.stuckT = 0;
-        const p = geom.posOf(r.proj.s, 0);
+        const p = geom.nearestSafeSpot(r.proj.s, r.proj.d, {
+          roadOnly: true,
+          margin: 24,
+          sSearchPx: 360,
+          stepPx: 16
+        }) ?? geom.posOf(r.proj.s, 0);
         r.x = p.x; r.y = p.y;
         r.heading = p.heading;
+        const spd = Math.max(r.speed, r.stats.topSpeed * 0.35);
+        r.vx = Math.cos(r.heading) * spd;
+        r.vy = Math.sin(r.heading) * spd;
+        r.proj = geom.project(r.x, r.y);
         r.status.invuln = Math.max(r.status.invuln, 0.6);
       }
     } else {
