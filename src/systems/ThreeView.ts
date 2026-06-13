@@ -167,6 +167,9 @@ interface Bill3D {
   seen: number;                      // frame stamp for mark-and-sweep
   lastX: number; lastZ: number;      // for rig gait speed
   tintColor: THREE.Color;
+  flat?: boolean;
+  face?: number;
+  rot?: number;
 }
 
 interface Particle {
@@ -229,6 +232,9 @@ export class ThreeView {
   private flushAcc = 0;
   private themeBg: number;
   private disposables: { dispose(): void }[] = [];
+  private smoothedLoad = 0;
+  private smoothedWeight = 0;
+  private lastFov = 0;
 
   constructor(
     scene: Phaser.Scene,
@@ -295,10 +301,10 @@ export class ThreeView {
     if (this.geom.featureAtProj(p)?.kind === "gap") {
       h -= 520;
     }
-    if (def.edgeMode === "fall") {
-      // floating course: the world drops away into the void past the corridor
-      const over = Math.abs(p.d) - (def.corridorHalf + 26);
-      if (over > 0) h -= Math.pow(clamp(over / 200, 0, 1), 1.6) * 640;
+    // Open edges/fall tracks drop the terrain away outside the corridor.
+    const over = Math.abs(p.d) - (def.corridorHalf + 26);
+    if (over > 0 && this.geom.edgeAt(p.s, p.d).mode === "open") {
+      h -= Math.pow(clamp(over / 200, 0, 1), 1.6) * 640;
     }
     return h;
   }
@@ -486,6 +492,7 @@ export class ThreeView {
     this.hor = this.HOR;
     this.showPlayer = p.showPlayer;
     this.Feff = this.F;
+    this.lastFov = 0;
     return p;
   }
 
@@ -519,14 +526,20 @@ export class ThreeView {
 
     // drive the actual 3D camera from the same state
     const cam = this.camera;
-    cam.fov = 2 * Math.atan((GAME_H / 2) / this.Feff) * (180 / Math.PI);
-    cam.updateProjectionMatrix();
-    const weightDip = clamp(p.weightTransfer * 52 + Math.abs(p.lateralLoad) * 5, -10, 18);
+    const nextFov = 2 * Math.atan((GAME_H / 2) / this.Feff) * (180 / Math.PI);
+    if (Math.abs(nextFov - this.lastFov) > 0.03) {
+      cam.fov = nextFov;
+      cam.updateProjectionMatrix();
+      this.lastFov = nextFov;
+    }
+    this.smoothedLoad += (p.lateralLoad - this.smoothedLoad) * (snap ? 1 : Math.min(dt * 9, 1));
+    this.smoothedWeight += (p.weightTransfer - this.smoothedWeight) * (snap ? 1 : Math.min(dt * 8, 1));
+    const weightDip = clamp(this.smoothedWeight * 42 + Math.abs(this.smoothedLoad) * 4, -8, 15);
     const eyeY = this.camH + this.H - weightDip;
     cam.position.set(this.camX, eyeY, this.camY);
     const pitch = Math.atan((GAME_H / 2 - this.hor) / this.Feff); // + looks down
     const D = 300;
-    const roll = clamp(-p.lateralLoad * 0.035 + (p.drifting ? -p.driftDir * 0.018 : 0), -0.07, 0.07);
+    const roll = clamp(-this.smoothedLoad * 0.027 + (p.drifting ? -p.driftDir * 0.014 : 0), -0.052, 0.052);
     cam.up.set(Math.sin(roll), Math.cos(roll), 0);
     cam.lookAt(
       this.camX + Math.cos(h) * D,
@@ -700,6 +713,9 @@ export class ThreeView {
     const m = b.mesh!;
     const w = b.w * sc, h = b.h * scY;
     m.scale.set(w, h, 1);
+    b.face = o.face;
+    b.rot = o.rot;
+    b.flat = !!o.flat;
 
     // tint + alpha follow the Phaser object so status flashes carry over
     const alpha = (go as Phaser.GameObjects.Sprite).alpha ?? 1;
@@ -724,10 +740,17 @@ export class ThreeView {
     const cy = gy + lift + h * (originY >= 0.95 ? 0.5 : 0.42);
     m.position.set(wx, cy, wy);
 
-    // camera-facing billboard with the art's own spin applied in view space
-    m.quaternion.copy(this.camera.quaternion);
-    const spin = o.face !== undefined ? (o.face - this.head) : (o.rot ?? 0);
-    if (spin) m.rotateZ(spin);
+    this.orientPlaneBillboard(b);
+  }
+
+  private orientPlaneBillboard(b: Bill3D) {
+    if (b.kind !== "plane" || b.flat || !b.mesh || !b.obj.visible) return;
+    // camera-facing billboard with the art's own spin applied in view space.
+    // This runs again just before render so submissions made before follow()
+    // don't keep a one-frame-old camera quaternion.
+    b.mesh.quaternion.copy(this.camera.quaternion);
+    const spin = b.face !== undefined ? (b.face - this.head) : (b.rot ?? 0);
+    if (spin) b.mesh.rotateZ(spin);
   }
 
   private placeRig(
@@ -915,6 +938,7 @@ export class ThreeView {
         b.obj.rotation.y += dt * 1.6;
         b.obj.rotation.x = Math.sin(this.frame * 0.02 + b.obj.position.x) * 0.25;
       }
+      this.orientPlaneBillboard(b);
     }
 
     // particles

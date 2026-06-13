@@ -39,6 +39,16 @@ async function waitForScene(page: Page, key: string) {
   );
 }
 
+async function waitForRaceReady(page: Page) {
+  await page.waitForFunction(
+    () =>
+      (window as any).__game?.registry.get("raceReady") === true &&
+      document.querySelectorAll("#three-world").length === 1,
+    undefined,
+    { timeout: 15_000 }
+  );
+}
+
 /** Collect every console error and uncaught page error for the whole test. */
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -86,12 +96,14 @@ test("plays through menus into a Grand Prix race without errors", async ({ page 
   await fireKey(page, "Enter", K.ENTER); // first cup (unlocked) -> Race
 
   await waitForScene(page, "Race");
+  await waitForRaceReady(page);
   // let the countdown elapse and the 3D world render several frames
   await page.waitForTimeout(4000);
 
   const scenes = await activeScenes(page);
   expect(scenes).toContain("Race");
   expect(scenes).toContain("Hud");
+  await expect(page.locator("#three-world")).toHaveCount(1);
 
   // WebGL really produced frames (Three renderer drew the world)
   const drew = await page.evaluate(() => {
@@ -101,6 +113,23 @@ test("plays through menus into a Grand Prix race without errors", async ({ page 
   expect(drew).toBe(true);
 
   expect(errors, errors.join("\n")).toEqual([]);
+});
+
+test("race loading blocks pause input until the curtain lifts", async ({ page }) => {
+  await page.goto("/?race=0");
+  await page.waitForFunction(() => {
+    const game = (window as any).__game;
+    if (!game?.isBooted) return false;
+    const active = game.scene.getScenes(true).map((s: any) => s.scene.key);
+    return active.includes("Race") && active.includes("Loading") && game.registry.get("raceInteractive") !== true;
+  }, undefined, { timeout: 15_000 });
+
+  await fireKey(page, "Escape", K.ESC);
+  await page.waitForTimeout(250);
+  expect(await activeScenes(page)).not.toContain("Pause");
+
+  await waitForRaceReady(page);
+  await page.waitForFunction(() => (window as any).__game.registry.get("raceInteractive") === true);
 });
 
 test("a setting change is written to localStorage and survives a reload", async ({ page }) => {

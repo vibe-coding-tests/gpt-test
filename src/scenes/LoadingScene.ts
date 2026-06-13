@@ -32,6 +32,8 @@ export default class LoadingScene extends Phaser.Scene {
     this.fading = false;
     this.dotAcc = 0;
     this.registry.set("raceReady", false);
+    this.registry.set("raceInteractive", false);
+    this.registry.set("raceLoading", true);
 
     const track = getTrack(GameState.trackId);
     const theme = track.theme;
@@ -77,6 +79,7 @@ export default class LoadingScene extends Phaser.Scene {
     // build the race underneath and pull this scene to the front to cover it
     if (!this.launched && this.frames >= 2) {
       this.launched = true;
+      if (this.scene.isActive("Race") || this.scene.isPaused("Race")) this.scene.stop("Race");
       this.scene.launch("Race");
       this.scene.bringToTop();
     }
@@ -92,7 +95,11 @@ export default class LoadingScene extends Phaser.Scene {
           alpha: 0,
           duration: 260,
           ease: "Quad.easeIn",
-          onComplete: () => this.scene.stop()
+          onComplete: () => {
+            this.registry.set("raceInteractive", true);
+            this.registry.set("raceLoading", false);
+            this.scene.stop();
+          }
         });
       }
     }

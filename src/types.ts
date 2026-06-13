@@ -65,6 +65,18 @@ export interface Shortcut {
   surface?: Extract<Surface, "road" | "boost" | "ice" | "mud">;
 }
 
+export type EdgeSide = "left" | "right" | "both";
+export type EdgeMode = "wall" | "guardrail" | "open";
+export type EdgePenalty = "normal" | "heavy";
+
+export interface EdgeSegment {
+  s0: number;
+  s1: number;
+  side?: EdgeSide;
+  mode: EdgeMode;
+  penalty?: EdgePenalty;
+}
+
 export type HazardKind =
   | "snorlax" | "diglett" | "zapdos"
   | "gastly" | "electrode" | "boulder" | "moltres" | "articuno";
@@ -110,6 +122,8 @@ export interface TrackDef {
   edgeMode: "wall" | "fall";
   /** On "fall" tracks: s-ranges with guardrails that bounce you back instead. */
   rails?: { s0: number; s1: number }[];
+  /** Segment-level edge overrides for guardrails, walls, or open/fall edges. */
+  edgeSegments?: EdgeSegment[];
   offroadKind: OffroadKind;
   theme: TrackTheme;
   features: Feature[];

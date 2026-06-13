@@ -65,8 +65,10 @@ export default class RaceScene extends Phaser.Scene {
   private speedFX!: SpeedFX;
   private speedK = 0; // smoothed 0..1 rush factor for FOV + speed lines
   private world!: TrackWorld;
-  perfStats = { frameMs: 0, simMs: 0, renderMs: 0 };
+  perfStats = { frameMs: 0, simMs: 0, renderMs: 0, worstFrameMs: 0, firstFrameMs: 0 };
   private firstFrameDone = false; // tells the loading curtain when to lift
+  private createStartedAt = 0;
+  private perfWindowT = 0;
 
   // remappable controls: each action maps to one or two Phaser keys
   private actionKeys!: Record<Action, Phaser.Input.Keyboard.Key[]>;
@@ -76,6 +78,9 @@ export default class RaceScene extends Phaser.Scene {
   }
 
   create() {
+    this.createStartedAt = performance.now();
+    this.perfWindowT = 0;
+    this.perfStats = { frameMs: 0, simMs: 0, renderMs: 0, worstFrameMs: 0, firstFrameMs: 0 };
     this.racers = [];
     this.aiDrivers = [];
     this.battleAIs = [];
@@ -216,13 +221,14 @@ export default class RaceScene extends Phaser.Scene {
     for (const code of binds.move2) discrete.set(code, () => this.tryUseMove(1));
     for (const code of binds.pause) discrete.set(code, () => this.pauseGame());
     kb.on("keydown", (e: KeyboardEvent) => {
+      if (!this.isRaceInteractive()) return;
       const fn = discrete.get(e.keyCode);
       if (fn) fn();
     });
     // fixed utility keys (not remappable)
     kb.on("keydown-M", () => Audio.toggleMute());
-    kb.on("keydown-C", () => this.cycleView());
-    kb.on("keydown-V", () => this.cycleCamera());
+    kb.on("keydown-C", () => this.isRaceInteractive() && this.cycleView());
+    kb.on("keydown-V", () => this.isRaceInteractive() && this.cycleCamera());
     this.bindCheatKeys(kb);
 
     // --- camera ---
@@ -263,8 +269,10 @@ export default class RaceScene extends Phaser.Scene {
   }
 
   private pauseGame() {
+    if (!this.isRaceInteractive()) return;
     if (this.ended) return;
     this.scene.launch("Pause");
+    this.scene.bringToTop("Pause");
     this.scene.pause();
   }
 
@@ -273,35 +281,35 @@ export default class RaceScene extends Phaser.Scene {
     if (!Save.cheats.debugKeys) return;
     const ok = () => !this.ended && !this.player.finished;
     kb.on("keydown-ONE", () => {
-      if (!ok()) return;
+      if (!this.isRaceInteractive() || !ok()) return;
       this.player.item = ITEM_LIST[this.cheatItemIdx++ % ITEM_LIST.length];
       this.player.rouletteT = 0;
       this.hud()?.toast(`CHEAT: ${ITEMS[this.player.item].name}`, "#c8d0ff");
     });
     kb.on("keydown-TWO", () => {
-      if (!ok()) return;
+      if (!this.isRaceInteractive() || !ok()) return;
       this.player.candies++;
       Audio.sfx("candy");
       this.hud()?.toast(`CHEAT: Rare Candy ${Math.min(this.player.candies, 2)}/2`, "#ffb8e8");
       this.player.evolveIfReady();
     });
     kb.on("keydown-THREE", () => {
-      if (!ok()) return;
+      if (!this.isRaceInteractive() || !ok()) return;
       this.player.candies = Math.max(this.player.candies, 2);
       this.player.evolveIfReady();
     });
     kb.on("keydown-FOUR", () => {
-      if (!ok()) return;
+      if (!this.isRaceInteractive() || !ok()) return;
       this.player.applyBoost(1.5, 1.6, "boost3");
       this.hud()?.toast("CHEAT: boost", "#ffd86a");
     });
     kb.on("keydown-FIVE", () => {
-      if (!ok()) return;
+      if (!this.isRaceInteractive() || !ok()) return;
       this.player.teleportToS(wrap01(this.player.proj.s + 0.06));
       this.hud()?.toast("CHEAT: warp ahead", "#c88aff");
     });
     kb.on("keydown-SIX", () => {
-      if (!ok()) return;
+      if (!this.isRaceInteractive() || !ok()) return;
       this.player.gainEnergy(100);
       this.hud()?.toast("CHEAT: full energy", "#8af0c8");
     });
@@ -417,11 +425,19 @@ export default class RaceScene extends Phaser.Scene {
     this.perfStats.frameMs += (frameMs - this.perfStats.frameMs) * k;
     this.perfStats.simMs += (simMs - this.perfStats.simMs) * k;
     this.perfStats.renderMs += (renderMs - this.perfStats.renderMs) * k;
+    this.perfWindowT += dt;
+    if (this.perfWindowT >= 3) {
+      this.perfWindowT = 0;
+      this.perfStats.worstFrameMs = frameMs;
+    } else {
+      this.perfStats.worstFrameMs = Math.max(this.perfStats.worstFrameMs, frameMs);
+    }
 
     // the 3D frame has now been built and drawn at least once — let the loading
     // curtain lift, revealing a race that's already rendering
     if (!this.firstFrameDone) {
       this.firstFrameDone = true;
+      this.perfStats.firstFrameMs = performance.now() - this.createStartedAt;
       this.registry.set("raceReady", true);
     }
   }
@@ -567,8 +583,19 @@ export default class RaceScene extends Phaser.Scene {
     return keys ? keys.some((k) => k.isDown) : false;
   }
 
+  private isRaceInteractive(): boolean {
+    return this.registry.get("raceInteractive") === true && !this.scene.isActive("Loading");
+  }
+
   private gatherPlayerInput() {
     const p = this.player;
+    if (!this.isRaceInteractive()) {
+      p.input.throttle = 0;
+      p.input.brake = false;
+      p.input.steer = 0;
+      p.input.drift = false;
+      return;
+    }
     if (this.playerAuto) {
       // item/move keypresses for the demo pilot are handled by the keydown
       // dispatcher; sprinkle in autonomous item/move use too
@@ -591,7 +618,7 @@ export default class RaceScene extends Phaser.Scene {
 
   private tryUseMove(slot: number) {
     const p = this.player;
-    if (!this.raceStarted || p.finished || this.ended || this.playerAuto) return;
+    if (!this.isRaceInteractive() || !this.raceStarted || p.finished || this.ended || this.playerAuto) return;
     const ok = this.moves.tryUse(p, slot);
     if (!ok && p.equippedMoves[slot]) {
       // tell the player why nothing happened instead of eating the press
@@ -602,7 +629,7 @@ export default class RaceScene extends Phaser.Scene {
 
   private tryUseItem() {
     const p = this.player;
-    if (!this.raceStarted || p.finished) return;
+    if (!this.isRaceInteractive() || !this.raceStarted || p.finished) return;
     if (GameState.mode === "tt") {
       if (p.agilityCharges > 0) {
         p.agilityCharges--;

@@ -11,6 +11,7 @@ import { GameState, startGp, startTimeTrial, startBattle } from "../state/GameSt
 import { movePool, unlockedCount, xpToNext, LEVEL_XP } from "../data/movesData";
 import { fmtTime, menuKeyGuard } from "../util";
 import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
+import { startRaceLoad } from "../systems/RaceTransition";
 
 const COLS = 6;
 const CELL = 84;
@@ -32,7 +33,7 @@ export default class SelectScene extends Phaser.Scene {
   private ids: number[] = [];
   private cursor = 0;
   private scrollRow = 0;
-  private cells: { c: Phaser.GameObjects.Container; spr: Phaser.GameObjects.Sprite }[] = [];
+  private cells: { c: Phaser.GameObjects.Container; spr: Phaser.GameObjects.Sprite | null }[] = [];
   private gridContainer!: Phaser.GameObjects.Container;
   private selRect!: Phaser.GameObjects.Rectangle;
   private panel: Phaser.GameObjects.GameObject[] = [];
@@ -91,14 +92,12 @@ export default class SelectScene extends Phaser.Scene {
       const y = GRID_Y + row * CELL + CELL / 2;
       const c = this.add.container(x, y);
       const bg = this.add.rectangle(0, 0, CELL - 10, CELL - 10, 0x202760).setStrokeStyle(2, 0x3a4380);
-      const key = ensurePokemonTexture(this, id);
-      const spr = this.add.sprite(0, -4, key, 2).setScale(0.86);
       const num = this.add.text(0, CELL / 2 - 18, `#${id}`, {
         fontFamily: UI.font, fontSize: "11px", color: "#8a94c8"
       }).setOrigin(0.5);
-      c.add([bg, spr, num]);
+      c.add([bg, num]);
       this.gridContainer.add(c);
-      this.cells.push({ c, spr });
+      this.cells.push({ c, spr: null });
     });
 
     this.selRect = this.add.rectangle(0, 0, CELL - 6, CELL - 6)
@@ -156,9 +155,15 @@ export default class SelectScene extends Phaser.Scene {
     if (row > this.scrollRow + VISIBLE_ROWS - 1) this.scrollRow = row - VISIBLE_ROWS + 1;
     this.gridContainer.y = -this.scrollRow * CELL;
 
-    this.cells.forEach(({ c }, i) => {
+    this.cells.forEach((cell, i) => {
       const r = Math.floor(i / COLS);
-      c.setVisible(r >= this.scrollRow && r < this.scrollRow + VISIBLE_ROWS);
+      const visible = r >= this.scrollRow && r < this.scrollRow + VISIBLE_ROWS;
+      cell.c.setVisible(visible);
+      if (visible && !cell.spr) {
+        const key = ensurePokemonTexture(this, this.ids[i]);
+        cell.spr = this.add.sprite(0, -4, key, 2).setScale(0.86);
+        cell.c.add(cell.spr);
+      }
     });
 
     const col = this.cursor % COLS;
@@ -252,14 +257,14 @@ export default class SelectScene extends Phaser.Scene {
       }
       startGp(this.listCursor, GameState.playerSpeciesId);
       Audio.stopBgm();
-      this.scene.start("Loading");
+      startRaceLoad(this);
       return;
     }
     const picked = this.trackList()[this.listCursor];
     if (this.flow === "battle") startBattle(picked.id, GameState.playerSpeciesId);
     else startTimeTrial(picked.id, GameState.playerSpeciesId);
     Audio.stopBgm();
-    this.scene.start("Loading");
+    startRaceLoad(this);
   }
 
   /** Swap the scene between its phases, fixing panels / title / grid visibility. */

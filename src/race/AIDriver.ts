@@ -100,7 +100,8 @@ export class AIDriver {
       }
     }
 
-    const tp = geom.posOf(sT, clamp(dT, -def.corridorHalf + 50, def.corridorHalf - 50));
+    const corridorHalf = geom.corridorHalfAt(sT, dT);
+    const tp = geom.posOf(sT, clamp(dT, -corridorHalf + 50, corridorHalf - 50));
     let err = wrapAngle(Math.atan2(tp.y - r.y, tp.x - r.x) - r.heading);
 
     // steer around live obstacles — swerve gently on fall-edge tracks so the
@@ -152,7 +153,7 @@ export class AIDriver {
     }
 
     // drift on sustained curves (not near a rim — low drift grip slides wide)
-    const nearRim = def.edgeMode === "fall" && Math.abs(r.proj.d) > def.roadHalf * 0.55;
+    const nearRim = geom.edgeAt(r.proj.s, r.proj.d || 1).mode === "open" && Math.abs(r.proj.d) > def.roadHalf * 0.55;
     let drift: boolean;
     if (r.drifting) {
       // hold for the big tiers, then bail as the corner straightens so the boost

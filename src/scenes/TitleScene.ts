@@ -57,7 +57,7 @@ export default class TitleScene extends Phaser.Scene {
     this.input.keyboard!.on("keydown-ENTER", () => ready() && this.go());
     this.input.keyboard!.on("keydown-SPACE", () => ready() && this.go());
     bindMenuCheatsShortcut(this, ready);
-    this.input.on("pointerdown", () => this.go());
+    this.input.on("pointerdown", () => ready() && this.go());
     this.input.keyboard!.once("keydown", () => Audio.unlock());
 
     this.add.text(GAME_W - 12, GAME_H - 10, "v1.0 · local save", {

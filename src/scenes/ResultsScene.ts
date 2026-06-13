@@ -11,6 +11,7 @@ import { Save } from "../systems/SaveSystem";
 import { MOVES } from "../data/movesData";
 import { fmtTime, menuKeyGuard, ordinal } from "../util";
 import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
+import { startRaceLoad } from "../systems/RaceTransition";
 
 interface Payload {
   mode: "gp" | "tt" | "battle";
@@ -242,7 +243,7 @@ export default class ResultsScene extends Phaser.Scene {
       return;
     }
     if (d.mode === "tt" || d.mode === "battle") {
-      this.scene.start("Loading"); // retry / rematch, GameState unchanged
+      startRaceLoad(this); // retry / rematch, GameState unchanged
       return;
     }
     if (d.isFinalRace) {
@@ -252,7 +253,7 @@ export default class ResultsScene extends Phaser.Scene {
       return;
     }
     gpAdvance();
-    this.scene.start("Loading");
+    startRaceLoad(this);
   }
 
   private drawPodium() {

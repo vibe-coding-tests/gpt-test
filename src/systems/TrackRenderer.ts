@@ -362,15 +362,17 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
     }
   }
 
-  // --- guardrail sections on fall tracks: a bright continuous rail ---
-  if (def.edgeMode === "fall" && def.rails) {
+  // --- guardrail sections: a bright continuous rail where geometry says the
+  // edge is protected, including one-sided segment overrides.
+  if (def.edgeMode === "fall" || def.edgeSegments?.length) {
     for (const side of [-1, 1]) {
+      const sideName = side < 0 ? "left" : "right";
       g.lineStyle(6, def.theme.roadEdge, 0.95);
       let open = false;
       g.beginPath();
       for (let k = 0; k <= N; k++) {
         const kk = k % N;
-        if (geom.railAt(kk / N)) {
+        if (geom.isRailAt(kk / N, sideName)) {
           const d = side * (def.corridorHalf - 2);
           const x = geom.xs[kk] + geom.nx[kk] * d;
           const y = geom.ys[kk] + geom.ny[kk] * d;
@@ -386,8 +388,9 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
     }
     // rail posts
     for (let k = 0; k < N; k += 6) {
-      if (!geom.railAt(k / N)) continue;
       for (const side of [-1, 1]) {
+        const sideName = side < 0 ? "left" : "right";
+        if (!geom.isRailAt(k / N, sideName)) continue;
         const d = side * (def.corridorHalf - 2);
         g.fillStyle(def.theme.wall, 1);
         g.fillCircle(geom.xs[k] + geom.nx[k] * d, geom.ys[k] + geom.ny[k] * d, 5);
@@ -397,8 +400,9 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
 
   // --- rails / edge markers ---
   for (let k = 0; k < N; k += 8) {
-    if (def.edgeMode === "fall" && geom.railAt(k / N)) continue; // rail drawn above
     for (const side of [-1, 1]) {
+      const sideName = side < 0 ? "left" : "right";
+      if (geom.isRailAt(k / N, sideName)) continue; // rail drawn above
       const d = side * (def.corridorHalf - 4);
       const x = geom.xs[k] + geom.nx[k] * d;
       const y = geom.ys[k] + geom.ny[k] * d;

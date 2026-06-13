@@ -121,6 +121,7 @@ export class Racer {
   slamPending: "body" | "quake" | null = null; // pulse fires on landing
   weatherMult = 1;            // Rain Dance
   offroadFreeT = 0;           // Rock Polish: terrain penalties waived
+  wallPenaltyT = 0;           // brief speed tax after a hard wall/guardrail hit
 
   item: ItemKind | null = null;
   rouletteT = 0;
@@ -814,6 +815,7 @@ export class Racer {
     this.bumpCd = Math.max(0, this.bumpCd - dt);
     this.hopT = Math.max(0, this.hopT - dt);
     this.agilityFxT = Math.max(0, this.agilityFxT - dt);
+    this.wallPenaltyT = Math.max(0, this.wallPenaltyT - dt);
     if (this.driftChainT > 0) {
       this.driftChainT -= dt;
       if (this.driftChainT <= 0) this.driftChain = 0;
@@ -947,6 +949,7 @@ export class Racer {
 
     const draftMult = 1 + 0.1 * clamp(this.draftT, 0, 1);
     let vmax = this.stats.topSpeed * this.speedMult * surfMult * statusMult * draftMult * this.weatherMult;
+    if (this.wallPenaltyT > 0) vmax *= 0.88;
     if (this.boostT > 0) vmax = Math.max(vmax * this.boostMult, this.stats.topSpeed * this.boostMult * 0.92);
 
     // hills: descents run faster, climbs slower — scaled by movement class
@@ -1058,7 +1061,9 @@ export class Racer {
     this.surface = rawSurface;
 
     if (rawSurface === "wall") {
-      const ch = this.geom.def.corridorHalf - 6;
+      const edge = this.geom.edgeAt(this.proj.s, this.proj.d);
+      const heavyWall = edge.penalty === "heavy";
+      const ch = this.geom.corridorHalfAt(this.proj.s, this.proj.d) - 6;
       const cl = clamp(this.proj.d, -ch, ch);
       const p = this.geom.posOf(this.proj.s, cl);
       this.x = p.x; this.y = p.y;
@@ -1070,11 +1075,13 @@ export class Racer {
       if (vn > 0) {
         this.vx -= sN.nx * outSign * vn;
         this.vy -= sN.ny * outSign * vn;
-        this.vx *= 0.82; this.vy *= 0.82;
+        const bleed = heavyWall ? 0.72 : 0.82;
+        this.vx *= bleed; this.vy *= bleed;
+        this.wallPenaltyT = Math.max(this.wallPenaltyT, heavyWall ? 0.7 : 0.45);
         if (this.speed > 150 && this.bumpCd <= 0) {
-          this.bumpCd = 0.4;
+          this.bumpCd = heavyWall ? 0.55 : 0.4;
           if (this.isPlayer) Audio.sfx("bump");
-          burst(this.scene, this.x, this.y, { color: 0xcccccc, n: 4, spd: 70, size: 4, life: 220 });
+          burst(this.scene, this.x, this.y, { color: heavyWall ? 0xffd080 : 0xcccccc, n: heavyWall ? 6 : 4, spd: 70, size: 4, life: 220 });
         }
       }
       this.surface = "offroad";

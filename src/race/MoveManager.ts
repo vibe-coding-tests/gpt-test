@@ -511,7 +511,7 @@ export class MoveManager {
 
       // walls / arena edge
       const proj = this.geom.project(s.x, s.y);
-      const out = Math.abs(proj.d) > this.geom.def.corridorHalf - 8;
+      const out = Math.abs(proj.d) > this.geom.corridorHalfAt(proj.s, proj.d) - 8;
 
       // lobs detonate on touchdown instead of on contact
       if (lobbed && s.z <= 0) {

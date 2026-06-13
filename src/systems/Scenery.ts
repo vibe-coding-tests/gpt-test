@@ -170,7 +170,8 @@ export class Scenery {
     const x = p.x + p.nx * d, y = p.y + p.ny * d;
     if (x < 30 || y < 30 || x > this.geom.worldW - 30 || y > this.geom.worldH - 30) return null;
     // the point may land on a different stretch of the course — keep it off the road
-    if (Math.abs(this.geom.project(x, y).d) < this.geom.def.corridorHalf + margin) return null;
+    const proj = this.geom.project(x, y);
+    if (Math.abs(proj.d) < this.geom.corridorHalfAt(proj.s, proj.d) + margin) return null;
     return { x, y };
   }
 

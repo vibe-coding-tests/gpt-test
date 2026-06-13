@@ -51,6 +51,18 @@ describe("TrackGeometry", () => {
     expect(geom.offroadSeverityAtProj(edgeProj)).toBeLessThan(1);
   });
 
+  test("classifies segment-level guardrails and open fall edges", () => {
+    const route = new TrackGeometry(TRACKS[0]);
+    expect(route.isRailAt(0.2, "right")).toBe(true);
+    expect(route.isRailAt(0.2, "left")).toBe(false);
+    expect(route.edgeAt(0.52, -route.def.corridorHalf - 20).penalty).toBe("heavy");
+    expect(route.surfaceAtProj({ s: 0.52, d: -route.def.corridorHalf - 20, idx: 0 })).toBe("wall");
+
+    const indigo = new TrackGeometry(TRACKS[8]);
+    expect(indigo.surfaceAtProj({ s: 0.1, d: indigo.def.corridorHalf + 20, idx: 0 })).toBe("wall");
+    expect(indigo.surfaceAtProj({ s: 0.21, d: indigo.def.corridorHalf + 20, idx: 0 })).toBe("gap");
+  });
+
   test("finds safe spots on solid terrain", () => {
     const geom = new TrackGeometry(TRACKS[0]);
     const spot = geom.nearestSafeSpot(0.45, 0, { roadOnly: true });

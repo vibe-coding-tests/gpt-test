@@ -70,6 +70,16 @@ describe("data integrity", () => {
         expect(row, track.name).toBeGreaterThanOrEqual(0);
         expect(row, track.name).toBeLessThanOrEqual(1);
       }
+
+      for (const edge of track.edgeSegments ?? []) {
+        expect(edge.s0, track.name).toBeGreaterThanOrEqual(0);
+        expect(edge.s0, track.name).toBeLessThanOrEqual(1);
+        expect(edge.s1, track.name).toBeGreaterThanOrEqual(0);
+        expect(edge.s1, track.name).toBeLessThanOrEqual(1);
+        expect(["left", "right", "both", undefined]).toContain(edge.side);
+        expect(["wall", "guardrail", "open"]).toContain(edge.mode);
+        expect(["normal", "heavy", undefined]).toContain(edge.penalty);
+      }
     }
   });
 });

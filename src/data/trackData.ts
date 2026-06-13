@@ -18,6 +18,11 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 132,
     corridorHalf: 300,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.16, s1: 0.3, side: "right", mode: "guardrail", penalty: "normal" },
+      { s0: 0.48, s1: 0.58, side: "left", mode: "guardrail", penalty: "heavy" },
+      { s0: 0.78, s1: 0.9, side: "both", mode: "guardrail", penalty: "normal" }
+    ],
     offroadKind: "grass",
     theme: {
       bg: 0x4f9e43, bgDetail: 0x3f8a36, corridor: 0x67b257,
@@ -402,9 +407,10 @@ export const TRACKS: TrackDef[] = [
     corridorHalf: 148,
     edgeMode: "fall",
     // rainbow rails guard most bends; the gap jumps and a few windows stay open
-    rails: [
-      { s0: 0.0, s1: 0.18 }, { s0: 0.24, s1: 0.34 }, { s0: 0.4, s1: 0.46 },
-      { s0: 0.52, s1: 0.63 }, { s0: 0.69, s1: 0.76 }, { s0: 0.82, s1: 0.99 }
+    edgeSegments: [
+      { s0: 0.0, s1: 0.18, mode: "guardrail" }, { s0: 0.24, s1: 0.34, mode: "guardrail" },
+      { s0: 0.4, s1: 0.46, mode: "guardrail" }, { s0: 0.52, s1: 0.63, mode: "guardrail" },
+      { s0: 0.69, s1: 0.76, mode: "guardrail" }, { s0: 0.82, s1: 0.99, mode: "guardrail" }
     ],
     offroadKind: "space",
     theme: {
@@ -459,9 +465,9 @@ export const TRACKS: TrackDef[] = [
     corridorHalf: 132,
     edgeMode: "fall",
     // handrails along the boardwalk — the broken-plank gaps stay deadly
-    rails: [
-      { s0: 0.0, s1: 0.28 }, { s0: 0.34, s1: 0.5 },
-      { s0: 0.56, s1: 0.76 }, { s0: 0.82, s1: 0.99 }
+    edgeSegments: [
+      { s0: 0.0, s1: 0.28, mode: "guardrail" }, { s0: 0.34, s1: 0.5, mode: "guardrail" },
+      { s0: 0.56, s1: 0.76, mode: "guardrail" }, { s0: 0.82, s1: 0.99, mode: "guardrail" }
     ],
     offroadKind: "rock",
     theme: {
@@ -614,6 +620,11 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 205,
     corridorHalf: 235,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.08, s1: 0.18, side: "both", mode: "guardrail", penalty: "normal" },
+      { s0: 0.42, s1: 0.52, side: "left", mode: "wall", penalty: "heavy" },
+      { s0: 0.76, s1: 0.86, side: "right", mode: "guardrail", penalty: "normal" }
+    ],
     offroadKind: "grass",
     theme: {
       bg: 0x4f9e43, bgDetail: 0x3f8a36, corridor: 0x67b257,

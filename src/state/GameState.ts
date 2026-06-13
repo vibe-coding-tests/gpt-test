@@ -53,6 +53,7 @@ export function pickRivals(playerId: number, rnd: () => number = Math.random): n
 
 export function startGp(cupId: number, playerSpeciesId: number) {
   GameState.mode = "gp";
+  GameState.demo = false;
   GameState.playerSpeciesId = playerSpeciesId;
   GameState.gp = {
     cupId,
@@ -65,6 +66,7 @@ export function startGp(cupId: number, playerSpeciesId: number) {
 
 export function startTimeTrial(trackId: number, playerSpeciesId: number) {
   GameState.mode = "tt";
+  GameState.demo = false;
   GameState.playerSpeciesId = playerSpeciesId;
   GameState.trackId = trackId;
   GameState.gp = null;
@@ -72,6 +74,7 @@ export function startTimeTrial(trackId: number, playerSpeciesId: number) {
 
 export function startBattle(arenaId: number, playerSpeciesId: number) {
   GameState.mode = "battle";
+  GameState.demo = false;
   GameState.playerSpeciesId = playerSpeciesId;
   GameState.trackId = arenaId;
   GameState.gp = null;

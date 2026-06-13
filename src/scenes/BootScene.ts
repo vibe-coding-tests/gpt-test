@@ -3,6 +3,7 @@ import { GameState, startGp, startTimeTrial, startBattle } from "../state/GameSt
 import { CUPS } from "../data/cups";
 import { ALL_IDS } from "../data/pokemonData";
 import { TRACKS } from "../data/trackData";
+import { startRaceLoad } from "../systems/RaceTransition";
 
 /** Generates all the small shared textures, then routes by URL params. */
 export default class BootScene extends Phaser.Scene {
@@ -19,10 +20,11 @@ export default class BootScene extends Phaser.Scene {
       let id = parseInt(q.get("battle") ?? "12", 10) || 12;
       if (id < 12) id += 12;
       id = Math.min(TRACKS.length - 1, Math.max(12, id));
-      GameState.demo = q.has("demo");
-      const species = GameState.demo ? ALL_IDS[Math.floor(Math.random() * ALL_IDS.length)] : 25;
+      const demo = q.has("demo");
+      const species = demo ? ALL_IDS[Math.floor(Math.random() * ALL_IDS.length)] : 25;
       startBattle(id, species);
-      this.scene.start("Loading");
+      GameState.demo = demo;
+      startRaceLoad(this);
       return;
     }
     if (q.has("demo")) {
@@ -32,14 +34,16 @@ export default class BootScene extends Phaser.Scene {
       const species = ALL_IDS[Math.floor(Math.random() * ALL_IDS.length)];
       if (TRACKS[trackId].arena) {
         startBattle(trackId, species);
-        this.scene.start("Loading");
+        GameState.demo = true;
+        startRaceLoad(this);
         return;
       }
       const cupId = CUPS.findIndex((c) => c.trackIds.includes(trackId));
       startGp(Math.max(0, cupId), species);
+      GameState.demo = true;
       GameState.gp!.raceIndex = CUPS[Math.max(0, cupId)].trackIds.indexOf(trackId);
       GameState.trackId = trackId;
-      this.scene.start("Loading");
+      startRaceLoad(this);
       return;
     }
     if (q.has("race")) {
@@ -48,12 +52,12 @@ export default class BootScene extends Phaser.Scene {
       startGp(cupId, 25);
       GameState.gp!.raceIndex = CUPS[cupId].trackIds.indexOf(trackId);
       GameState.trackId = trackId;
-      this.scene.start("Loading");
+      startRaceLoad(this);
       return;
     }
     if (q.has("tt")) {
       startTimeTrial(Math.min(11, Math.max(0, parseInt(q.get("tt") ?? "0", 10) || 0)), 25);
-      this.scene.start("Loading");
+      startRaceLoad(this);
       return;
     }
     this.scene.start("Title");

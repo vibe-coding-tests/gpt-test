@@ -327,9 +327,9 @@ export class ItemManager {
         p.y += p.vy * dt;
         const proj = this.geom.project(p.x, p.y, p.idxHint);
         p.idxHint = proj.idx;
-        const limit = this.geom.def.corridorHalf - 10;
+        const limit = this.geom.corridorHalfAt(proj.s, proj.d) - 10;
         if (Math.abs(proj.d) > limit) {
-          if (this.geom.def.edgeMode === "fall" && !this.geom.railAt(proj.s)) {
+          if (this.geom.edgeAt(proj.s, proj.d).mode === "open") {
             this.popProjectile(i, 0x9aa3c7);
             continue;
           }

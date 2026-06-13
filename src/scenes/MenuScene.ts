@@ -75,6 +75,7 @@ export default class MenuScene extends Phaser.Scene {
     kb.on("keydown-ESC", () => {
       if (!ready()) return;
       Audio.sfx("back");
+      Audio.stopBgm();
       this.scene.start("Title");
     });
     kb.on("keydown-M", () => {

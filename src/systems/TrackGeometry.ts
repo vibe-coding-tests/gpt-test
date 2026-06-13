@@ -1,4 +1,4 @@
-import type { Feature, Shortcut, Surface, TrackDef } from "../types";
+import type { EdgeMode, EdgePenalty, EdgeSide, EdgeSegment, Feature, Shortcut, Surface, TrackDef } from "../types";
 import { clamp, wrap01 } from "../util";
 
 const SAMPLES = 1024;
@@ -34,6 +34,12 @@ export interface SafeSpot {
   d: number;
 }
 
+export interface EdgeInfo {
+  mode: EdgeMode;
+  penalty: EdgePenalty;
+  segment?: EdgeSegment;
+}
+
 interface SafeSpotOpts {
   /** Keep the search inside the painted road instead of the whole corridor. */
   roadOnly?: boolean;
@@ -52,6 +58,12 @@ const FEATURE_PRIORITY: Record<string, number> = {
 };
 
 const DEFAULT_SAFE_SURFACES: readonly Surface[] = ["road", "offroad", "boost", "ramp", "ice", "mud"];
+
+const sideForD = (d: number): Exclude<EdgeSide, "both"> => d < 0 ? "left" : "right";
+
+function sideMatches(side: EdgeSide | undefined, wanted: EdgeSide): boolean {
+  return !side || side === "both" || wanted === "both" || side === wanted;
+}
 
 /**
  * Closed-loop Catmull-Rom centerline with arc-length parameterization.
@@ -321,13 +333,42 @@ export class TrackGeometry {
   }
 
   /** True when a guardrail section protects the corridor edge at s. */
-  railAt(s: number): boolean {
+  railAt(s: number, side: EdgeSide = "both"): boolean {
+    return this.isRailAt(s, side);
+  }
+
+  isRailAt(s: number, side: EdgeSide = "both"): boolean {
+    const segs = this.def.edgeSegments ?? [];
+    for (const seg of segs) {
+      if (!TrackGeometry.inRange(s, seg.s0, seg.s1)) continue;
+      if (!sideMatches(seg.side, side)) continue;
+      if (seg.mode === "guardrail" || seg.mode === "wall") return true;
+    }
     const rails = this.def.rails;
     if (!rails) return false;
     for (const r of rails) {
       if (TrackGeometry.inRange(s, r.s0, r.s1)) return true;
     }
     return false;
+  }
+
+  edgeAt(s: number, d: number): EdgeInfo {
+    const side = sideForD(d);
+    for (const seg of this.def.edgeSegments ?? []) {
+      if (!TrackGeometry.inRange(s, seg.s0, seg.s1)) continue;
+      if (!sideMatches(seg.side, side)) continue;
+      return { mode: seg.mode, penalty: seg.penalty ?? "normal", segment: seg };
+    }
+    if (this.def.edgeMode === "fall") {
+      return this.isRailAt(s, side)
+        ? { mode: "guardrail", penalty: "normal" }
+        : { mode: "open", penalty: "normal" };
+    }
+    return { mode: "wall", penalty: "normal" };
+  }
+
+  corridorHalfAt(_s: number, _d = 0): number {
+    return this.def.corridorHalf;
   }
 
   surfaceAtProj(p: Projection): Surface {
@@ -337,8 +378,9 @@ export class TrackGeometry {
       if (Math.abs(p.d) <= sc.def.roadHalf) return sc.def.surface ?? "road";
       return "offroad";
     }
-    if (Math.abs(p.d) > this.def.corridorHalf) {
-      if (this.def.edgeMode === "fall" && !this.railAt(p.s)) return "gap";
+    if (Math.abs(p.d) > this.corridorHalfAt(p.s, p.d)) {
+      const edge = this.edgeAt(p.s, p.d);
+      if (edge.mode === "open") return "gap";
       return "wall";
     }
     const f = this.featureAtProj(p);
@@ -361,12 +403,14 @@ export class TrackGeometry {
    * means some part of the course is right there.
    */
   onCourse(x: number, y: number, pad = 0): boolean {
-    return Math.abs(this.project(x, y).d) <= this.def.corridorHalf + pad;
+    const p = this.project(x, y);
+    return Math.abs(p.d) <= this.corridorHalfAt(p.s, p.d) + pad;
   }
 
   nearestSafeSpot(s: number, preferredD = 0, opts: SafeSpotOpts = {}): SafeSpot | null {
     const margin = opts.margin ?? 18;
-    const half = Math.max(0, (opts.roadOnly ? this.def.roadHalf : this.def.corridorHalf) - margin);
+    const baseHalf = opts.roadOnly ? this.def.roadHalf : this.corridorHalfAt(wrap01(s), preferredD);
+    const half = Math.max(0, baseHalf - margin);
     const step = Math.max(8, opts.stepPx ?? 18);
     const searchPx = Math.max(0, opts.sSearchPx ?? 260);
     const safe = new Set(opts.surfaces ?? DEFAULT_SAFE_SURFACES);

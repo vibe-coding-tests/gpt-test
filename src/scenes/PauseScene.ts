@@ -4,6 +4,7 @@ import { Audio } from "../systems/AudioSystem";
 import { GameState } from "../state/GameState";
 import { menuKeyGuard } from "../util";
 import type RaceScene from "./RaceScene";
+import { startRaceLoad } from "../systems/RaceTransition";
 
 interface PauseOption {
   label: string;
@@ -105,10 +106,7 @@ export default class PauseScene extends Phaser.Scene {
   private restartRace() {
     Audio.sfx("select");
     Audio.stopBgm();
-    this.scene.stop("Hud");
-    this.scene.stop("Race");
-    this.scene.stop();
-    this.scene.start("Loading");
+    startRaceLoad(this);
   }
 
   private exitTo(key: string, data?: object) {
