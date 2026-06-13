@@ -27,6 +27,9 @@ export const TRACKS: TrackDef[] = [
       { kind: "boost", s0: 0.44, s1: 0.465, d0: -110, d1: 110 },
       { kind: "mud", s0: 0.62, s1: 0.66, d0: -40, d1: 110 }
     ],
+    shortcuts: [
+      { s0: 0.55, s1: 0.645, d0: -72, d1: 86, roadHalf: 58, corridorHalf: 125, surface: "mud" }
+    ],
     hazards: [
       { kind: "diglett", s: 0.25, d: -50 },
       { kind: "diglett", s: 0.72, d: 40 }
@@ -65,6 +68,10 @@ export const TRACKS: TrackDef[] = [
       { kind: "mud", s0: 0.22, s1: 0.27, d0: -88, d1: 30 },
       { kind: "boost", s0: 0.5, s1: 0.52, d0: -88, d1: 88 },
       { kind: "mud", s0: 0.68, s1: 0.72, d0: 0, d1: 88 }
+    ],
+    shortcuts: [
+      { s0: 0.185, s1: 0.305, d0: 68, d1: -72, roadHalf: 48, corridorHalf: 98, surface: "mud" },
+      { s0: 0.78, s1: 0.87, d0: -64, d1: 66, roadHalf: 44, corridorHalf: 92 }
     ],
     hazards: [
       { kind: "diglett", s: 0.15, d: 30 },
@@ -113,6 +120,10 @@ export const TRACKS: TrackDef[] = [
       { kind: "water", s0: 0.8, s1: 0.87, d0: 60, d1: 320 },      // right tide
       { kind: "boost", s0: 0.93, s1: 0.95, d0: -120, d1: 120 }
     ],
+    shortcuts: [
+      { s0: 0.365, s1: 0.505, d0: -178, d1: -108, roadHalf: 52, corridorHalf: 116, surface: "boost" },
+      { s0: 0.775, s1: 0.885, d0: 132, d1: 146, roadHalf: 50, corridorHalf: 112 }
+    ],
     hazards: [
       { kind: "diglett", s: 0.33, d: 40 },
       { kind: "diglett", s: 0.76, d: -40 }
@@ -155,6 +166,10 @@ export const TRACKS: TrackDef[] = [
       { kind: "boost", s0: 0.9, s1: 0.92, d0: -92, d1: 92 },
       { kind: "mud", s0: 0.31, s1: 0.35, d0: -30, d1: 92 },
       { kind: "mud", s0: 0.55, s1: 0.6, d0: -92, d1: 92 }
+    ],
+    shortcuts: [
+      { s0: 0.255, s1: 0.365, d0: 74, d1: -76, roadHalf: 42, corridorHalf: 90 },
+      { s0: 0.66, s1: 0.775, d0: -70, d1: 70, roadHalf: 44, corridorHalf: 96, surface: "mud" }
     ],
     hazards: [
       { kind: "diglett", s: 0.12, d: 0 },
@@ -294,6 +309,10 @@ export const TRACKS: TrackDef[] = [
       { kind: "boost", s0: 0.58, s1: 0.62, d0: -96, d1: -22 },
       { kind: "boost", s0: 0.72, s1: 0.76, d0: 22, d1: 96 },
       { kind: "boost", s0: 0.85, s1: 0.87, d0: -96, d1: 96 }
+    ],
+    shortcuts: [
+      { s0: 0.335, s1: 0.455, d0: 72, d1: -74, roadHalf: 46, corridorHalf: 94, surface: "boost" },
+      { s0: 0.62, s1: 0.73, d0: -70, d1: 72, roadHalf: 44, corridorHalf: 92 }
     ],
     hazards: [
       { kind: "zapdos" },
@@ -503,6 +522,10 @@ export const TRACKS: TrackDef[] = [
       { kind: "boost", s0: 0.52, s1: 0.54, d0: -100, d1: 100 },
       { kind: "mud", s0: 0.62, s1: 0.66, d0: -100, d1: -10 },
       { kind: "boost", s0: 0.9, s1: 0.92, d0: -100, d1: 100 }
+    ],
+    shortcuts: [
+      { s0: 0.315, s1: 0.43, d0: -78, d1: 76, roadHalf: 46, corridorHalf: 98, surface: "mud" },
+      { s0: 0.59, s1: 0.715, d0: 78, d1: -74, roadHalf: 44, corridorHalf: 96 }
     ],
     hazards: [
       { kind: "boulder", s: 0.3, d: 0 },

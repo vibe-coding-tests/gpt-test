@@ -3,7 +3,7 @@ import { test, expect, type Page } from "@playwright/test";
 const SAVE_KEY = "pokekart-save-v1";
 
 // keyCodes Phaser keys off of
-const K = { ENTER: 13, SPACE: 32, ESC: 27, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40 };
+const K = { ENTER: 13, SPACE: 32, ESC: 27, LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, F9: 120 };
 
 /**
  * Phaser listens for keydown on `window`, so dispatch synthetic events there.
@@ -108,14 +108,14 @@ test("a setting change is written to localStorage and survives a reload", async 
   await waitForScene(page, "Menu");
   await page.waitForTimeout(350); // clear the scene's input grace window
 
-  // CHEATS is the last menu row; place the cursor there directly (synthetic
-  // key cadence is unreliable under headless throttling), then open it.
-  const CHEATS_ROW = 6; // gp, battle, tt, dex, help, controls, cheats
-  await page.evaluate((row) => {
-    (window as any).__game.scene.getScene("Menu").cursor = row;
-  }, CHEATS_ROW);
-  await fireKey(page, "Enter", K.ENTER); // open Cheats
+  const menuRows = await page.evaluate(() =>
+    (window as any).__game.scene.getScene("Menu").rows.map((t: any) => t.text)
+  );
+  expect(menuRows.join(" ")).not.toContain("CHEATS");
+
+  await fireKey(page, "F9", K.F9); // hidden debug shortcut
   await waitForScene(page, "Cheats");
+  await page.waitForTimeout(350);
 
   await fireKey(page, "Enter", K.ENTER); // toggle "UNLOCK EVERYTHING"
   await page.waitForTimeout(250);
@@ -129,6 +129,63 @@ test("a setting change is written to localStorage and survives a reload", async 
   await waitForScene(page, "Title");
   const afterReload = await page.evaluate((k) => localStorage.getItem(k), SAVE_KEY);
   expect(JSON.parse(afterReload!).cheats.unlockAll).toBe(true);
+});
+
+test("hidden cheats shortcut opens from menu screens and returns", async ({ page }) => {
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "F9", K.F9);
+  await waitForScene(page, "Cheats");
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "Escape", K.ESC);
+  await page.waitForFunction(() => {
+    const active = (window as any).__game.scene.getScenes(true).map((s: any) => s.scene.key);
+    return active.includes("Title") && !active.includes("Cheats");
+  });
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "Enter", K.ENTER); // Title -> Menu
+  await waitForScene(page, "Menu");
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "Enter", K.ENTER); // GRAND PRIX -> Select
+  await waitForScene(page, "Select");
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "F9", K.F9);
+  await waitForScene(page, "Cheats");
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "Escape", K.ESC);
+  await page.waitForFunction(() => {
+    const active = (window as any).__game.scene.getScenes(true).map((s: any) => s.scene.key);
+    return active.includes("Select") && !active.includes("Cheats");
+  });
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "Escape", K.ESC); // Select -> Menu
+  await waitForScene(page, "Menu");
+  await page.waitForTimeout(350);
+
+  await page.evaluate(() => {
+    const menu = (window as any).__game.scene.getScene("Menu");
+    menu.cursor = 5; // CONTROLS
+    menu.refresh();
+  });
+  await fireKey(page, "Enter", K.ENTER);
+  await waitForScene(page, "Controls");
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "F9", K.F9);
+  await waitForScene(page, "Cheats");
+  await page.waitForTimeout(350);
+
+  await fireKey(page, "Escape", K.ESC);
+  await page.waitForFunction(() => {
+    const active = (window as any).__game.scene.getScenes(true).map((s: any) => s.scene.key);
+    return active.includes("Controls") && !active.includes("Cheats");
+  });
 });
 
 test("saved Pokémon unlocks and trophies are loaded back from storage", async ({ page }) => {

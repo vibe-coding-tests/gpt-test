@@ -54,6 +54,17 @@ export interface Feature {
   d0: number; d1: number; // lateral range in px (negative = left of centerline)
 }
 
+export interface Shortcut {
+  /** Start/end are main-track coordinates; racers progress from s0 toward s1. */
+  s0: number;
+  s1: number;
+  d0?: number;
+  d1?: number;
+  roadHalf: number;
+  corridorHalf: number;
+  surface?: Extract<Surface, "road" | "boost" | "ice" | "mud">;
+}
+
 export type HazardKind =
   | "snorlax" | "diglett" | "zapdos"
   | "gastly" | "electrode" | "boulder" | "moltres" | "articuno";
@@ -102,6 +113,7 @@ export interface TrackDef {
   offroadKind: OffroadKind;
   theme: TrackTheme;
   features: Feature[];
+  shortcuts?: Shortcut[];
   hazards: HazardSpec[];
   hills?: Hill[];
   itemRows: number[];   // s positions of item box rows

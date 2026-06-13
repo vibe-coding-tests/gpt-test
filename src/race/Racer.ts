@@ -674,6 +674,7 @@ export class Racer {
     vmax: number;
     slope: number;
     gripSurface: number;
+    offroadSeverity: number;
   }) {
     const hx = Math.cos(this.heading), hy = Math.sin(this.heading);
     let fwd = this.vx * hx + this.vy * hy;
@@ -681,7 +682,7 @@ export class Racer {
 
     let longAccel = this.stats.accel * opts.throttle;
     if (this.status.paralysis > 0) longAccel *= 0.72;
-    if (this.surface === "offroad") longAccel *= 0.85;
+    if (this.surface === "offroad") longAccel *= 0.96 - opts.offroadSeverity * 0.28;
     if (fwd < opts.vmax || longAccel < 0) {
       fwd += longAccel * step;
     } else {
@@ -922,7 +923,12 @@ export class Racer {
     let surfMult = 1;
     const def = this.def;
     switch (this.surface) {
-      case "offroad": surfMult = offroadMult(def, this.geom.def.offroadKind); break;
+      case "offroad": {
+        const rough = this.geom.offroadSeverityAtProj(this.proj);
+        const worst = offroadMult(def, this.geom.def.offroadKind);
+        surfMult = 1 - (1 - worst) * (0.35 + rough * 0.65);
+        break;
+      }
       case "water": surfMult = waterMult(def); break;
       case "lava": surfMult = def.types.includes("fire") ? 1.06 : 0.75; break;
       case "mud": surfMult = def.cls === "floater" ? 1 : def.cls === "flyer" ? 0.85 : 0.55; break;
@@ -978,6 +984,7 @@ export class Racer {
 
     // --- grip-core physics ---
     const gripSurface = surfaceGrip(this.surface, def, this.airT > 0, this.offroadFreeT > 0 || this.transform === "dig");
+    const offroadSeverity = this.surface === "offroad" ? this.geom.offroadSeverityAtProj(this.proj) : 0;
     let remaining = dt;
     let substeps = 0;
     while (remaining > 0 && substeps < 8) {
@@ -990,7 +997,8 @@ export class Racer {
         steerFx,
         vmax,
         slope,
-        gripSurface
+        gripSurface,
+        offroadSeverity
       });
       remaining -= step;
       substeps++;
@@ -1004,7 +1012,8 @@ export class Racer {
         steerFx,
         vmax,
         slope,
-        gripSurface
+        gripSurface,
+        offroadSeverity
       });
     }
     this.updateDriftCharge(dt, steer);

@@ -162,6 +162,17 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
     }
   };
 
+  const shortcutBand = (sc: (typeof geom.shortcuts)[number], d0: number, d1: number, color: number, alpha = 1) => {
+    const pts: Pt[] = [
+      { x: sc.ax + sc.nx * d0, y: sc.ay + sc.ny * d0 },
+      { x: sc.ax + sc.nx * d1, y: sc.ay + sc.ny * d1 },
+      { x: sc.bx + sc.nx * d1, y: sc.by + sc.ny * d1 },
+      { x: sc.bx + sc.nx * d0, y: sc.by + sc.ny * d0 }
+    ];
+    g.fillStyle(color, alpha);
+    g.fillPoints(pts);
+  };
+
   // --- terrain ---
   g.fillStyle(def.theme.bg, 1);
   g.fillRect(0, 0, W, H);
@@ -247,6 +258,34 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
       const b = { x: geom.xs[(k + STEP) % N] + geom.nx[(k + STEP) % N] * dd, y: geom.ys[(k + STEP) % N] + geom.ny[(k + STEP) % N] * dd };
       g.lineStyle(8, (k / STEP) % 2 === 0 ? 0xe84a4a : 0xf8f8f8, 0.95);
       g.lineBetween(a.x, a.y, b.x, b.y);
+    }
+  }
+
+  // --- shortcuts ---
+  for (const sc of geom.shortcuts) {
+    const surfColor = sc.def.surface === "boost" ? 0xffc93a
+      : sc.def.surface === "ice" ? 0xcfeeff
+        : sc.def.surface === "mud" ? 0x6a4a2e
+          : def.theme.road;
+    shortcutBand(sc, -sc.def.corridorHalf, sc.def.corridorHalf, def.theme.corridor, 1);
+    shortcutBand(sc, -sc.def.roadHalf, sc.def.roadHalf, surfColor, 1);
+    shortcutBand(sc, sc.def.roadHalf - 7, sc.def.roadHalf, def.theme.roadEdge, 0.95);
+    shortcutBand(sc, -sc.def.roadHalf, -sc.def.roadHalf + 7, def.theme.roadEdge, 0.95);
+
+    const marks = Math.max(2, Math.floor(sc.len / 140));
+    for (let i = 1; i < marks; i++) {
+      const t = i / marks;
+      const p = geom.shortcutPos(sc, t, 0);
+      g.fillStyle(sc.def.surface === "boost" ? 0xffffff : def.theme.roadEdge, sc.def.surface === "boost" ? 0.9 : 0.42);
+      if (sc.def.surface === "boost") {
+        g.fillTriangle(
+          p.x - sc.nx * 16 - sc.tx * 8, p.y - sc.ny * 16 - sc.ty * 8,
+          p.x + sc.nx * 16 - sc.tx * 8, p.y + sc.ny * 16 - sc.ty * 8,
+          p.x + sc.tx * 18, p.y + sc.ty * 18
+        );
+      } else {
+        g.fillCircle(p.x, p.y, 3);
+      }
     }
   }
 

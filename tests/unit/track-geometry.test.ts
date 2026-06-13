@@ -34,6 +34,23 @@ describe("TrackGeometry", () => {
     expect(geom.surfaceAtProj({ s: 0.5, d: geom.def.corridorHalf + 30, idx: 0 })).toBe("wall");
   });
 
+  test("projects shortcut pavement onto its own drivable corridor", () => {
+    const geom = new TrackGeometry(TRACKS[1]);
+    const shortcut = geom.shortcuts[0];
+    const mid = geom.shortcutPos(shortcut, 0.5, 0);
+    const edge = geom.shortcutPos(shortcut, 0.5, shortcut.def.roadHalf + 12);
+
+    const midProj = geom.project(mid.x, mid.y);
+    expect(midProj.shortcut).toBe(0);
+    expect(geom.surfaceAtProj(midProj)).toBe(shortcut.def.surface ?? "road");
+
+    const edgeProj = geom.project(edge.x, edge.y);
+    expect(edgeProj.shortcut).toBe(0);
+    expect(geom.surfaceAtProj(edgeProj)).toBe("offroad");
+    expect(geom.offroadSeverityAtProj(edgeProj)).toBeGreaterThan(0);
+    expect(geom.offroadSeverityAtProj(edgeProj)).toBeLessThan(1);
+  });
+
   test("finds safe spots on solid terrain", () => {
     const geom = new TrackGeometry(TRACKS[0]);
     const spot = geom.nearestSafeSpot(0.45, 0, { roadOnly: true });

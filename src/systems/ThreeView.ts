@@ -54,7 +54,8 @@ export const CAM_PRESETS: CamPreset[] = [
   { name: "LOW", h: 54, f: 405, back: 106, hor: 0.385, showPlayer: true },
   { name: "CLASSIC", h: 86, f: 330, back: 124, hor: 0.38, showPlayer: true },
   { name: "HIGH", h: 132, f: 296, back: 172, hor: 0.43, showPlayer: true },
-  { name: "BUMPER", h: 42, f: 440, back: 34, hor: 0.36, showPlayer: false }
+  { name: "BUMPER", h: 42, f: 440, back: 34, hor: 0.36, showPlayer: false },
+  { name: "WIDE", h: 118, f: 270, back: 245, hor: 0.455, showPlayer: true }
 ];
 
 function shade(color: number, f: number) {
@@ -318,10 +319,11 @@ export class ThreeView {
     geo.computeVertexNormals();
 
     this.groundTex = new THREE.CanvasTexture(this.world.canvas);
-    this.groundTex.flipY = false;
+    // Plane UVs put v=1 at world y/z 0, matching the canvas top once Three
+    // performs its usual image flip on upload.
+    this.groundTex.flipY = true;
     this.groundTex.colorSpace = THREE.SRGBColorSpace;
     this.groundTex.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
-    // plane UVs run v top→bottom; with flipY off that matches canvas rows directly
     const ground = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: this.groundTex }));
     this.scene3.add(ground);
     this.disposables.push(geo, ground.material as THREE.Material, this.groundTex);

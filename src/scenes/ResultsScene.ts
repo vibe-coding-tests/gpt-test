@@ -10,6 +10,7 @@ import { Audio } from "../systems/AudioSystem";
 import { Save } from "../systems/SaveSystem";
 import { MOVES } from "../data/movesData";
 import { fmtTime, menuKeyGuard, ordinal } from "../util";
+import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
 
 interface Payload {
   mode: "gp" | "tt" | "battle";
@@ -51,6 +52,7 @@ export default class ResultsScene extends Phaser.Scene {
       Audio.stopBgm();
       this.scene.start("Menu");
     });
+    bindMenuCheatsShortcut(this, ready);
 
     if (this.data2.playerRank === 1) Audio.sfx("victory");
     else if (this.data2.playerRank >= 6 && this.data2.mode === "gp") Audio.sfx("losejingle");

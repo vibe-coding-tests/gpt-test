@@ -10,6 +10,7 @@ import { TRACKS, RACE_TRACKS, ARENAS } from "../data/trackData";
 import { GameState, startGp, startTimeTrial, startBattle } from "../state/GameState";
 import { movePool, unlockedCount, xpToNext, LEVEL_XP } from "../data/movesData";
 import { fmtTime, menuKeyGuard } from "../util";
+import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
 
 const COLS = 6;
 const CELL = 84;
@@ -112,6 +113,7 @@ export default class SelectScene extends Phaser.Scene {
     kb.on("keydown-ENTER", () => ready() && this.onConfirm());
     kb.on("keydown-SPACE", () => ready() && this.onConfirm());
     kb.on("keydown-ESC", () => ready() && this.onBack());
+    bindMenuCheatsShortcut(this, ready);
 
     this.refreshGrid();
   }

@@ -90,4 +90,4 @@ export function bindLabel(codes: number[]): string {
 }
 
 /** Key codes that should never be rebound (reserved for UI / system). */
-export const RESERVED_CODES = new Set<number>([K.M, K.C, K.V]);
+export const RESERVED_CODES = new Set<number>([K.M, K.C, K.V, K.F9]);

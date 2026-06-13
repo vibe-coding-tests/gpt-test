@@ -4,6 +4,7 @@ import { Audio } from "../systems/AudioSystem";
 import { ensurePokemonTexture } from "../systems/SpriteFactory";
 import { STARTER_IDS } from "../constants";
 import { menuKeyGuard } from "../util";
+import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
 
 export default class TitleScene extends Phaser.Scene {
   private parade: { spr: Phaser.GameObjects.Sprite; speed: number; t: number }[] = [];
@@ -55,6 +56,7 @@ export default class TitleScene extends Phaser.Scene {
     const ready = menuKeyGuard(this);
     this.input.keyboard!.on("keydown-ENTER", () => ready() && this.go());
     this.input.keyboard!.on("keydown-SPACE", () => ready() && this.go());
+    bindMenuCheatsShortcut(this, ready);
     this.input.on("pointerdown", () => this.go());
     this.input.keyboard!.once("keydown", () => Audio.unlock());
 

@@ -17,9 +17,14 @@ export default class CheatsScene extends Phaser.Scene {
   private labels: Phaser.GameObjects.Text[] = [];
   private pips: Phaser.GameObjects.Text[] = [];
   private descText!: Phaser.GameObjects.Text;
+  private returnTo: string | null = null;
 
   constructor() {
     super("Cheats");
+  }
+
+  init(data: { returnTo?: string }) {
+    this.returnTo = data.returnTo ?? null;
   }
 
   create() {
@@ -72,7 +77,12 @@ export default class CheatsScene extends Phaser.Scene {
     kb.on("keydown-ESC", () => {
       if (!ready()) return;
       Audio.sfx("back");
-      this.scene.start("Menu");
+      if (this.returnTo) {
+        this.scene.resume(this.returnTo);
+        this.scene.stop();
+      } else {
+        this.scene.start("Menu");
+      }
     });
 
     this.refresh();

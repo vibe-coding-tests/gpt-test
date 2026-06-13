@@ -251,7 +251,7 @@ export default class RaceScene extends Phaser.Scene {
     this.hud()?.toast(VIEW_LABELS[mode], "#8ecdff");
   }
 
-  /** Cycle the first-person camera rig (low / classic / high / bumper). */
+  /** Cycle the first-person camera rig (low / classic / high / bumper / wide). */
   cycleCamera() {
     if (!this.view.isM7) {
       this.hud()?.toast("CAMERA RIGS ARE FIRST-PERSON ONLY (C TO SWITCH VIEW)", "#8ecdff");

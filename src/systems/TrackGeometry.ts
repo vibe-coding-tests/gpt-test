@@ -1,4 +1,4 @@
-import type { Feature, Surface, TrackDef } from "../types";
+import type { Feature, Shortcut, Surface, TrackDef } from "../types";
 import { clamp, wrap01 } from "../util";
 
 const SAMPLES = 1024;
@@ -8,6 +8,22 @@ export interface Projection {
   s: number;   // 0..1 along the lap
   d: number;   // signed lateral offset px
   idx: number; // nearest sample index (projection hint)
+  shortcut?: number;
+  shortcutT?: number;
+}
+
+export interface ShortcutSegment {
+  def: Shortcut;
+  ax: number;
+  ay: number;
+  bx: number;
+  by: number;
+  tx: number;
+  ty: number;
+  nx: number;
+  ny: number;
+  len: number;
+  span: number;
 }
 
 export interface SafeSpot {
@@ -59,6 +75,7 @@ export class TrackGeometry {
   private slopes = new Float64Array(SAMPLES);
   private arcIndex = new Uint32Array(SAMPLES + 1);
   private featuresSorted: Feature[];
+  readonly shortcuts: ShortcutSegment[];
 
   constructor(def: TrackDef) {
     this.def = def;
@@ -109,12 +126,35 @@ export class TrackGeometry {
       this.arcIndex[j] = k;
     }
 
+    this.shortcuts = (def.shortcuts ?? []).map((sc) => {
+      const a = this.posOf(sc.s0, sc.d0 ?? 0);
+      const b = this.posOf(sc.s1, sc.d1 ?? 0);
+      let dx = b.x - a.x;
+      let dy = b.y - a.y;
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len; dy /= len;
+      return {
+        def: sc,
+        ax: a.x, ay: a.y, bx: b.x, by: b.y,
+        tx: dx, ty: dy, nx: -dy, ny: dx,
+        len,
+        span: wrap01(sc.s1 - sc.s0)
+      };
+    });
+
     const reach = def.corridorHalf + MARGIN;
     for (let i = 0; i < SAMPLES; i++) {
       this.minX = Math.min(this.minX, this.xs[i] - reach);
       this.minY = Math.min(this.minY, this.ys[i] - reach);
       this.maxX = Math.max(this.maxX, this.xs[i] + reach);
       this.maxY = Math.max(this.maxY, this.ys[i] + reach);
+    }
+    for (const sc of this.shortcuts) {
+      const reachSc = sc.def.corridorHalf + MARGIN;
+      this.minX = Math.min(this.minX, sc.ax - reachSc, sc.bx - reachSc);
+      this.minY = Math.min(this.minY, sc.ay - reachSc, sc.by - reachSc);
+      this.maxX = Math.max(this.maxX, sc.ax + reachSc, sc.bx + reachSc);
+      this.maxY = Math.max(this.maxY, sc.ay + reachSc, sc.by + reachSc);
     }
     this.minX = Math.max(0, this.minX);
     this.minY = Math.max(0, this.minY);
@@ -190,6 +230,15 @@ export class TrackGeometry {
     return { x: p.x + p.nx * d, y: p.y + p.ny * d, heading: Math.atan2(p.ty, p.tx) };
   }
 
+  shortcutPos(sc: ShortcutSegment, t: number, d = 0) {
+    const u = clamp(t, 0, 1);
+    return {
+      x: sc.ax + sc.tx * sc.len * u + sc.nx * d,
+      y: sc.ay + sc.ty * sc.len * u + sc.ny * d,
+      heading: Math.atan2(sc.ty, sc.tx)
+    };
+  }
+
   headingAt(s: number) {
     const p = this.sample(s);
     return Math.atan2(p.ty, p.tx);
@@ -224,7 +273,32 @@ export class TrackGeometry {
     const along = px * this.tx[k] + py * this.ty[k];
     const d = px * this.nx[k] + py * this.ny[k];
     const s = wrap01((this.cum[k] + along) / this.total);
-    return { s, d, idx: k };
+    let best: Projection = { s, d, idx: k };
+
+    for (let i = 0; i < this.shortcuts.length; i++) {
+      const sc = this.shortcuts[i];
+      const relX = x - sc.ax;
+      const relY = y - sc.ay;
+      const alongSc = clamp(relX * sc.tx + relY * sc.ty, 0, sc.len);
+      const dSc = relX * sc.nx + relY * sc.ny;
+      const nearX = sc.ax + sc.tx * alongSc;
+      const nearY = sc.ay + sc.ty * alongSc;
+      const dx = x - nearX;
+      const dy = y - nearY;
+      const d2 = dx * dx + dy * dy;
+      if (Math.abs(d) <= this.def.roadHalf + 8 && d2 > 4) continue;
+      if (Math.abs(dSc) > sc.def.corridorHalf + 48 || d2 >= bestD2) continue;
+      const t = alongSc / sc.len;
+      bestD2 = d2;
+      best = {
+        s: wrap01(sc.def.s0 + sc.span * t),
+        d: dSc,
+        idx: this.sample(wrap01(sc.def.s0 + sc.span * t)).idx,
+        shortcut: i,
+        shortcutT: t
+      };
+    }
+    return best;
   }
 
   /** Whether s lies inside [s0, s1] (range may wrap past 1). */
@@ -233,6 +307,7 @@ export class TrackGeometry {
   }
 
   featureAtProj(p: Projection): Feature | null {
+    if (p.shortcut !== undefined) return null;
     for (const f of this.featuresSorted) {
       if (p.d >= f.d0 && p.d <= f.d1 && TrackGeometry.inRange(p.s, f.s0, f.s1)) return f;
     }
@@ -256,6 +331,12 @@ export class TrackGeometry {
   }
 
   surfaceAtProj(p: Projection): Surface {
+    if (p.shortcut !== undefined) {
+      const sc = this.shortcuts[p.shortcut];
+      if (Math.abs(p.d) > sc.def.corridorHalf) return "wall";
+      if (Math.abs(p.d) <= sc.def.roadHalf) return sc.def.surface ?? "road";
+      return "offroad";
+    }
     if (Math.abs(p.d) > this.def.corridorHalf) {
       if (this.def.edgeMode === "fall" && !this.railAt(p.s)) return "gap";
       return "wall";
@@ -263,6 +344,12 @@ export class TrackGeometry {
     const f = this.featureAtProj(p);
     if (f) return f.kind;
     return Math.abs(p.d) <= this.def.roadHalf ? "road" : "offroad";
+  }
+
+  offroadSeverityAtProj(p: Projection): number {
+    const roadHalf = p.shortcut !== undefined ? this.shortcuts[p.shortcut].def.roadHalf : this.def.roadHalf;
+    const corridorHalf = p.shortcut !== undefined ? this.shortcuts[p.shortcut].def.corridorHalf : this.def.corridorHalf;
+    return clamp((Math.abs(p.d) - roadHalf) / Math.max(1, corridorHalf - roadHalf), 0, 1);
   }
 
   /**

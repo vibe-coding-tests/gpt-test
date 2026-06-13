@@ -4,6 +4,7 @@ import { Audio } from "../systems/AudioSystem";
 import { Save } from "../systems/SaveSystem";
 import { ACTIONS, RESERVED_CODES, bindLabel, keyName, type Binds } from "../systems/Controls";
 import { menuKeyGuard } from "../util";
+import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
 
 /** View and remap the driving controls. */
 export default class ControlsScene extends Phaser.Scene {
@@ -65,6 +66,7 @@ export default class ControlsScene extends Phaser.Scene {
 
     const kb = this.input.keyboard!;
     const ready = menuKeyGuard(this);
+    bindMenuCheatsShortcut(this, ready, () => !this.listening);
 
     // a single low-level listener so we can capture ANY key while rebinding
     kb.on("keydown", (e: KeyboardEvent) => {
@@ -112,7 +114,7 @@ export default class ControlsScene extends Phaser.Scene {
     }
     if (RESERVED_CODES.has(code)) {
       Audio.sfx("back");
-      this.hint.setText(`${keyName(code)} is reserved (mute / view / camera). Pick another key.`);
+      this.hint.setText(`${keyName(code)} is reserved (mute / view / camera / debug). Pick another key.`);
       return;
     }
     Save.rebind(ACTIONS[this.cursor].action, [code]);

@@ -4,6 +4,7 @@ import { Audio } from "../systems/AudioSystem";
 import { Save } from "../systems/SaveSystem";
 import { CUPS } from "../data/cups";
 import { menuKeyGuard } from "../util";
+import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
 
 const OPTIONS = [
   { key: "gp", label: "GRAND PRIX", desc: "4 cups · 3 races each · podium finish" },
@@ -70,11 +71,7 @@ export default class MenuScene extends Phaser.Scene {
     kb.on("keydown-DOWN", () => ready() && this.move(1));
     kb.on("keydown-ENTER", () => ready() && this.choose());
     kb.on("keydown-SPACE", () => ready() && this.choose());
-    kb.on("keydown-F9", () => {
-      if (!ready() || this.helpPanel) return;
-      Audio.sfx("select");
-      this.scene.start("Cheats");
-    });
+    bindMenuCheatsShortcut(this, ready);
     kb.on("keydown-ESC", () => {
       if (!ready()) return;
       Audio.sfx("back");

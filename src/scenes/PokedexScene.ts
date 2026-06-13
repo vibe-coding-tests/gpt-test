@@ -6,6 +6,7 @@ import { getPokemon, CLASS_LABEL, TYPE_COLORS } from "../data/pokemonData";
 import { deriveStats } from "../systems/Stats";
 import { ensurePokemonTexture } from "../systems/SpriteFactory";
 import { menuKeyGuard } from "../util";
+import { bindMenuCheatsShortcut } from "../systems/MenuShortcuts";
 
 const COLS = 8;
 const ROWS = 4;
@@ -74,6 +75,7 @@ export default class PokedexScene extends Phaser.Scene {
       Audio.sfx("back");
       this.scene.start("Menu");
     });
+    bindMenuCheatsShortcut(this, ready);
 
     this.refresh();
   }
