@@ -19,6 +19,16 @@ const CLASS_BASE: Record<string, { sp: number; ac: number; hd: number; wt: numbe
   heavy: { sp: 0.88, ac: 0.46, hd: 0.52, wt: 0.96 }
 };
 
+const CLASS_HANDLING: Record<string, {
+  front: number; rear: number; steer: number; wheelbase: number; cgFront: number; inertia: number; catch: number;
+}> = {
+  runner: { front: 1.07, rear: 1.04, steer: 0.56, wheelbase: 48, cgFront: 0.53, inertia: 0.82, catch: 0.82 },
+  flyer: { front: 0.88, rear: 0.92, steer: 0.47, wheelbase: 54, cgFront: 0.5, inertia: 0.94, catch: 0.58 },
+  floater: { front: 0.98, rear: 0.82, steer: 0.53, wheelbase: 52, cgFront: 0.51, inertia: 0.86, catch: 0.68 },
+  swimmer: { front: 1.0, rear: 0.98, steer: 0.51, wheelbase: 53, cgFront: 0.53, inertia: 0.98, catch: 0.64 },
+  heavy: { front: 0.96, rear: 1.09, steer: 0.41, wheelbase: 62, cgFront: 0.49, inertia: 1.38, catch: 0.45 }
+};
+
 /**
  * Type modifiers are trade-offs: each gives with one hand and takes with the
  * other, so picking a type is a flavor choice, never a free stat bump. (wt
@@ -77,18 +87,25 @@ export function deriveStats(def: PokemonDef): DerivedStats {
   hd = clamp(hd, 0.05, 1);
   wt = clamp(wt, 0.05, 1);
 
-  const gripByClass: Record<string, number> = {
-    runner: 9, flyer: 5.5, floater: 4.5, swimmer: 6.5, heavy: 7.5
-  };
+  const handling = CLASS_HANDLING[def.cls];
+  const mass = 0.8 + wt * 1.7;
+  const radius = 15 + def.size * 3.5 + (def.cls === "heavy" ? 3 : 0);
+  const gripFromHd = 0.78 + hd * 0.36;
+  const wheelbase = handling.wheelbase + def.size * 3.5;
 
   return {
     sp, ac, hd, wt,
     topSpeed: 300 + sp * 150,
     accel: 260 + ac * 340,
-    turnRate: 1.9 + hd * 1.2,
-    mass: 0.8 + wt * 1.7,
-    grip: gripByClass[def.cls],
-    radius: 15 + def.size * 3.5 + (def.cls === "heavy" ? 3 : 0)
+    mass,
+    gripFront: clamp(handling.front * gripFromHd, 0.55, 1.35),
+    gripRear: clamp(handling.rear * (0.8 + hd * 0.34), 0.5, 1.32),
+    steerLock: clamp(handling.steer * (0.82 + hd * 0.28), 0.32, 0.7),
+    wheelbase,
+    cgFront: handling.cgFront,
+    izz: mass * wheelbase * wheelbase * 0.12 * handling.inertia,
+    catchAssist: handling.catch,
+    radius
   };
 }
 

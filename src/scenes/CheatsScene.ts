@@ -33,11 +33,11 @@ export default class CheatsScene extends Phaser.Scene {
     g.fillStyle(UI.panel, 1).fillRoundedRect(180, 150, GAME_W - 360, 360, 16);
     g.lineStyle(3, 0xffcb05, 0.8).strokeRoundedRect(180, 150, GAME_W - 360, 360, 16);
 
-    this.add.text(GAME_W / 2, 80, "CHEATS", {
+    this.add.text(GAME_W / 2, 80, "DEBUG", {
       fontFamily: UI.font, fontSize: "52px", fontStyle: "bold",
       color: UI.yellow, stroke: UI.blue, strokeThickness: 10
     }).setOrigin(0.5);
-    this.add.text(GAME_W / 2, 126, "debug switches — saved between sessions, off by default", {
+    this.add.text(GAME_W / 2, 126, "saved debug switches — off by default", {
       fontFamily: UI.font, fontSize: "15px", color: "#7a86b8"
     }).setOrigin(0.5);
 

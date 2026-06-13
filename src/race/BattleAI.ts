@@ -107,17 +107,23 @@ export class BattleAI {
       }
     }
 
-    let steer = clamp(err * 2.4, -1, 1);
+    let steer = clamp(err * 2.15, -1, 1);
     let throttle = 1;
     if (Math.abs(err) > 1.7) throttle = 0.3;       // turning around — pivot hard
     else if (Math.abs(err) > 1.1) throttle = 0.6;
+
+    const slipK = clamp((Math.abs(r.slipAngle) - 0.08) / 0.34, 0, 1);
+    if (slipK > 0) {
+      steer = clamp(steer + Math.sign(r.slipAngle) * slipK * (r.drifting ? 0.32 : 0.5), -1, 1);
+      if (!r.drifting && slipK > 0.45) throttle = Math.min(throttle, 0.78);
+    }
 
     // hop-drift through big swings to whip the turn around
     let drift: boolean;
     if (r.drifting) {
       drift = !(r.driftTier >= 2 || Math.abs(err) < 0.2);
     } else {
-      if (Math.abs(err) > 0.7 && r.speed > r.stats.topSpeed * 0.55 && r.airT <= 0) {
+      if (Math.abs(err) > 0.62 && r.speed > r.stats.topSpeed * 0.52 && r.airT <= 0) {
         this.driftHoldT += dt;
       } else {
         this.driftHoldT = 0;

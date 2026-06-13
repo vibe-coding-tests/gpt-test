@@ -363,7 +363,8 @@ export default class RaceScene extends Phaser.Scene {
         speedFrac: spF,
         surface: p.surface,
         airborne: p.airT > 0,
-        drifting: p.drifting
+        drifting: p.drifting,
+        slip: p.slipRatio
       });
       // continuous wind rush + skid screech, scaled by what the body is doing
       const boost = p.boostT > 0;
@@ -372,14 +373,15 @@ export default class RaceScene extends Phaser.Scene {
         + (p.airT > 0 ? 0.025 : 0)
         + (p.draftT > 0.7 ? 0.018 : 0);
       const grounded = p.airT <= 0;
-      const hardCorner = grounded && !p.drifting && p.latAbs > 95 && spF > 0.5;
+      const slipK = clamp((p.slipRatio - 0.18) / 0.82, 0, 1);
+      const hardCorner = grounded && !p.drifting && slipK > 0.22 && spF > 0.5;
       const skid = p.drifting && grounded ? 0.026 + p.driftTier * 0.007
-        : hardCorner ? clamp((p.latAbs - 95) / 130, 0, 1) * 0.03 : 0;
+        : hardCorner ? slipK * 0.033 : 0;
       Audio.speedLoop({
         wind,
         windHz: 1300 + spF * 2400 + (boost ? 900 : 0),
         skid,
-        skidHz: (p.surface === "ice" ? 3300 : 2300) + p.driftCharge * 220 + p.latAbs * 1.5
+        skidHz: (p.surface === "ice" ? 3300 : 2300) + p.driftCharge * 220 + p.slipRatio * 950
       });
     }
     this.rankBlipCd = Math.max(0, this.rankBlipCd - dt);
@@ -684,10 +686,11 @@ export default class RaceScene extends Phaser.Scene {
           burst(this, t.x, t.y, { color: 0xdddddd, n: 1, spd: 40, size: 4, life: 200 });
         }
         // hard flat-out cornering scrubs the surface even without a drift
-        const hardCorner = grounded && !r.drifting && r.latAbs > 95 && r.speed > r.stats.topSpeed * 0.5;
+        const slipK = clamp((r.slipRatio - 0.18) / 0.82, 0, 1);
+        const hardCorner = grounded && !r.drifting && slipK > 0.25 && r.speed > r.stats.topSpeed * 0.5;
         if (hardCorner) {
           const t = r.tailPos(0.9);
-          burst(this, t.x, t.y, { color: 0xaab0bc, n: 1, spd: 46, size: 5, life: 240 });
+          burst(this, t.x, t.y, { color: 0xaab0bc, n: 1, spd: 42 + slipK * 32, size: 4 + slipK * 4, life: 220 + slipK * 120 });
         }
         if (grounded && (hardCorner || (r.drifting && r.driftTier > 0))) {
           this.stampSkid(r);

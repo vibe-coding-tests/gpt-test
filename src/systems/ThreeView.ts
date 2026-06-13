@@ -496,7 +496,7 @@ export class ThreeView {
   follow(p: Racer, dt: number, snap = false) {
     const wantHead = p.status.spin > 0 ? this.head : p.heading;
     this.head = snap ? wantHead : rotLerp(this.head, wantHead, dt * 5.2);
-    const peek = p.drifting ? p.driftDir * 0.085 : 0;
+    const peek = p.drifting ? p.driftDir * 0.085 : clamp(p.slipAngle, -0.45, 0.45) * 0.045;
     const h = this.head + peek;
     this.camX = p.x - Math.cos(h) * this.BACK;
     this.camY = p.y - Math.sin(h) * this.BACK;
@@ -519,10 +519,13 @@ export class ThreeView {
     const cam = this.camera;
     cam.fov = 2 * Math.atan((GAME_H / 2) / this.Feff) * (180 / Math.PI);
     cam.updateProjectionMatrix();
-    const eyeY = this.camH + this.H;
+    const weightDip = clamp(p.weightTransfer * 52 + Math.abs(p.lateralLoad) * 5, -10, 18);
+    const eyeY = this.camH + this.H - weightDip;
     cam.position.set(this.camX, eyeY, this.camY);
     const pitch = Math.atan((GAME_H / 2 - this.hor) / this.Feff); // + looks down
     const D = 300;
+    const roll = clamp(-p.lateralLoad * 0.035 + (p.drifting ? -p.driftDir * 0.018 : 0), -0.07, 0.07);
+    cam.up.set(Math.sin(roll), Math.cos(roll), 0);
     cam.lookAt(
       this.camX + Math.cos(h) * D,
       eyeY - Math.tan(pitch) * D,

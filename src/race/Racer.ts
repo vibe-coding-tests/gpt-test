@@ -4,7 +4,8 @@ import { deriveStats, offroadMult, typeEffect, waterMult } from "../systems/Stat
 import { getPokemon } from "../data/pokemonData";
 import { ensurePokemonTexture } from "../systems/SpriteFactory";
 import { TrackGeometry, type Projection } from "../systems/TrackGeometry";
-import { clamp, lerp, wrap01, wrapAngle } from "../util";
+import { HANDLING_STEP, HANDLING_TUNE, loadSplit, surfaceGrip, tireCurve } from "../systems/Handling";
+import { clamp, wrap01, wrapAngle } from "../util";
 import { Audio } from "../systems/AudioSystem";
 import { burst, floatText, ringPulse } from "../systems/effects";
 import type { ThreeView } from "../systems/ThreeView";
@@ -23,16 +24,16 @@ export interface RacerInput {
  * mini-turbo fastest, so a long committed slide is *their* game. Runners get
  * quick, tidy turbos; heavies barely slide and charge slowest, but their mass
  * already carries the corner.
- *   slip   — how far the slide kicks the nose out (radians)
- *   charge — multiplier on how fast the mini-turbo builds
- *   turn   — base authority of the drift's pull toward the corner
+ *   rearGrip — rear-axle grip retained while drifting (lower = wider slide)
+ *   charge   — multiplier on how fast real slip feeds the mini-turbo
+ *   turn     — base authority of the drift's pull toward the corner
  */
-const DRIFT_PROFILE: Record<string, { slip: number; charge: number; turn: number }> = {
-  runner: { slip: 0.34, charge: 1.15, turn: 1.0 },
-  flyer: { slip: 0.5, charge: 1.2, turn: 0.82 },
-  floater: { slip: 0.56, charge: 1.3, turn: 0.92 },
-  swimmer: { slip: 0.42, charge: 1.0, turn: 0.9 },
-  heavy: { slip: 0.3, charge: 0.82, turn: 0.74 }
+const DRIFT_PROFILE: Record<string, { rearGrip: number; charge: number; turn: number }> = {
+  runner: { rearGrip: 0.68, charge: 1.15, turn: 1.0 },
+  flyer: { rearGrip: 0.56, charge: 1.2, turn: 0.82 },
+  floater: { rearGrip: 0.5, charge: 1.3, turn: 0.92 },
+  swimmer: { rearGrip: 0.62, charge: 1.0, turn: 0.9 },
+  heavy: { rearGrip: 0.74, charge: 0.82, turn: 0.74 }
 };
 
 /**
@@ -140,6 +141,15 @@ export class Racer {
   private updraftCd = 0; // flyer crest-surge cooldown
   private stunnedPrev = false; // for the shake-it-off rebound
   latAbs = 0; // lateral slip px/s, read by cornering fx/audio
+  yawRate = 0; // body rotation rate from the grip model
+  slipAngle = 0; // signed travel angle vs nose, radians
+  frontSlip = 0;
+  rearSlip = 0;
+  slipRatio = 0; // 0..1-ish grip loss read by fx/audio/AI
+  gripMu = 1;
+  loadFront = 0.5;
+  lateralLoad = 0; // signed lateral acceleration hint for camera roll
+  weightTransfer = 0; // +front load under braking, -rear squat on throttle
   private airPeak = 0; // biggest airT of the current flight, for landing impact
   private airPrev = false;
 
@@ -200,12 +210,26 @@ export class Racer {
   placeAt(x: number, y: number, heading: number) {
     this.x = x; this.y = y; this.heading = heading;
     this.vx = 0; this.vy = 0;
+    this.resetHandlingDynamics();
     this.proj = this.geom.project(x, y);
     this.totalProgress = this.proj.s > 0.5 ? this.proj.s - 1 : this.proj.s;
     this.lastSafeS = this.proj.s;
     this.cpHits = new Array(CHECKPOINTS).fill(false);
     this.cpHits[Math.floor(wrap01(this.proj.s) * CHECKPOINTS) % CHECKPOINTS] = true;
     this.syncVisual(0);
+  }
+
+  private resetHandlingDynamics() {
+    this.yawRate = 0;
+    this.slipAngle = 0;
+    this.frontSlip = 0;
+    this.rearSlip = 0;
+    this.slipRatio = 0;
+    this.latAbs = 0;
+    this.lateralLoad = 0;
+    this.weightTransfer = 0;
+    this.loadFront = this.stats.cgFront;
+    this.gripMu = 1;
   }
 
   /** Adjust totalProgress so its fractional lap position matches newS. */
@@ -489,6 +513,7 @@ export class Racer {
     // fast enough to clear a ramp right after the respawn point
     this.vx = Math.cos(this.heading) * 230;
     this.vy = Math.sin(this.heading) * 230;
+    this.resetHandlingDynamics();
     this.falling = false;
     this.fallRot = 0;
     this.status.invuln = 2.6;
@@ -511,6 +536,7 @@ export class Racer {
     const sp = this.stats.topSpeed * 0.8;
     this.vx = Math.cos(this.heading) * sp;
     this.vy = Math.sin(this.heading) * sp;
+    this.resetHandlingDynamics();
     this.proj = this.geom.project(this.x, this.y);
     this.syncProgress(this.proj.s);
     this.status.invuln = Math.max(this.status.invuln, 0.8);
@@ -617,6 +643,156 @@ export class Racer {
     this.driftCharge = 0;
     this.driftTier = 0;
     this.driftPerfectT = 0;
+  }
+
+  private updateDriftCharge(dt: number, steer: number) {
+    if (!this.drifting) return;
+
+    const dp = DRIFT_PROFILE[this.def.cls];
+    const align = clamp(steer * this.driftDir, -1, 1);
+    const slipK = clamp((Math.abs(this.slipAngle) - 0.055) / 0.28, 0, 1);
+    const scrubK = clamp(this.latAbs / Math.max(160, this.stats.topSpeed * 0.55), 0, 1);
+    const hold = Math.max(slipK, scrubK * 0.75);
+    this.driftCharge += dt * (0.35 + hold * 1.15 + Math.max(align, 0) * 0.35) * dp.charge;
+
+    const newTier = this.driftCharge >= DRIFT_TIERS[2] ? 3
+      : this.driftCharge >= DRIFT_TIERS[1] ? 2
+        : this.driftCharge >= DRIFT_TIERS[0] ? 1 : 0;
+    if (newTier > this.driftTier) {
+      this.driftTier = newTier;
+      this.driftPerfectT = 0.26;
+      if (this.isPlayer) Audio.sfx("drifttick");
+    }
+  }
+
+  private integrateHandlingStep(step: number, opts: {
+    throttle: number;
+    brake: boolean;
+    raceStarted: boolean;
+    stunned: boolean;
+    steerFx: number;
+    vmax: number;
+    slope: number;
+    gripSurface: number;
+  }) {
+    const hx = Math.cos(this.heading), hy = Math.sin(this.heading);
+    let fwd = this.vx * hx + this.vy * hy;
+    let lat = this.vx * -hy + this.vy * hx;
+
+    let longAccel = this.stats.accel * opts.throttle;
+    if (this.status.paralysis > 0) longAccel *= 0.72;
+    if (this.surface === "offroad") longAccel *= 0.85;
+    if (fwd < opts.vmax || longAccel < 0) {
+      fwd += longAccel * step;
+    } else {
+      longAccel = 0;
+    }
+
+    if (this.boostT > 0 && fwd < opts.vmax * 0.85) {
+      const boostAccel = this.stats.accel * 1.6;
+      fwd += boostAccel * step;
+      longAccel += boostAccel;
+    }
+
+    if (opts.slope !== 0) {
+      const slopeAccel = opts.slope * 480;
+      fwd -= slopeAccel * step;
+      longAccel -= slopeAccel;
+    }
+
+    if (fwd > opts.vmax) {
+      fwd += (opts.vmax - fwd) * (1 - Math.exp(-3.2 * step));
+    } else if (opts.throttle <= 0.02) {
+      fwd *= Math.exp(-1.1 * step);
+      longAccel -= 120;
+    }
+
+    if (opts.brake && opts.raceStarted && !opts.stunned) {
+      fwd -= 520 * step;
+      longAccel -= 520;
+      if (fwd < -90) fwd = -90;
+    } else if (fwd < 0) {
+      fwd *= Math.exp(-3 * step);
+    }
+
+    if (this.status.sleep > 0 || this.status.squash > 0 || this.status.freeze > 0) {
+      fwd *= Math.exp(-6.5 * step);
+      lat *= Math.exp(-6.5 * step);
+      this.yawRate *= Math.exp(-7 * step);
+    }
+
+    const speedFrac = Math.abs(fwd) / Math.max(1, this.stats.topSpeed);
+    const lowBoost = clamp(speedFrac / 0.5, 0.55, 1);
+    const highTaper = this.boostT > 0 ? 1 : 1 - clamp((speedFrac - 0.62) / 0.38, 0, 1) * 0.25;
+    let steerAngle = opts.steerFx * this.stats.steerLock * lowBoost * highTaper;
+    if (this.status.paralysis > 0) steerAngle *= 0.72;
+
+    const dp = DRIFT_PROFILE[this.def.cls];
+    let frontGrip = this.stats.gripFront;
+    let rearGrip = this.stats.gripRear;
+    if (this.drifting) {
+      const align = opts.steerFx * this.driftDir;
+      const counter = Math.max(-align, 0);
+      const driftBias = this.driftDir * (0.23 + Math.max(align, 0) * 0.14) * dp.turn;
+      steerAngle = clamp(opts.steerFx * (0.55 + counter * 0.85) + driftBias, -1.1, 1.1)
+        * this.stats.steerLock * lowBoost;
+      rearGrip *= dp.rearGrip * (this.hopT > 0 ? 0.78 : 1);
+      frontGrip *= 1.04 + counter * 0.16;
+    }
+    if (opts.brake && Math.abs(opts.steerFx) > 0.15) {
+      frontGrip *= 1.07;
+      rearGrip *= 0.94;
+    }
+
+    const loads = loadSplit(this.stats.cgFront, longAccel);
+    this.loadFront = loads.front;
+    this.weightTransfer = loads.front - this.stats.cgFront;
+    this.gripMu = opts.gripSurface;
+
+    const absFwd = Math.max(Math.abs(fwd), 32);
+    const a = this.stats.wheelbase * (1 - this.stats.cgFront);
+    const b = this.stats.wheelbase * this.stats.cgFront;
+    const alphaF = Math.atan2(lat + this.yawRate * a, absFwd) - steerAngle;
+    const alphaR = Math.atan2(lat - this.yawRate * b, absFwd);
+    this.frontSlip = alphaF;
+    this.rearSlip = alphaR;
+
+    const muF = frontGrip * opts.gripSurface;
+    const muR = rearGrip * opts.gripSurface;
+    const fyF = -tireCurve(alphaF) * muF * loads.front * HANDLING_TUNE.lateralAccel;
+    const fyR = -tireCurve(alphaR) * muR * loads.rear * HANDLING_TUNE.lateralAccel;
+    const latAccel = fyF * Math.cos(steerAngle) + fyR - fwd * this.yawRate * 0.62;
+    const inertiaScale = Math.max(0.55, this.stats.izz / 900);
+    const yawAccel = ((fyF * a * Math.cos(steerAngle) - fyR * b) / this.stats.wheelbase)
+      * HANDLING_TUNE.yawGain / inertiaScale;
+
+    lat += latAccel * step;
+    this.yawRate += yawAccel * step;
+
+    const avgGrip = (muF + muR) * 0.5;
+    this.yawRate *= Math.exp(-HANDLING_TUNE.yawDamping * (0.38 + avgGrip * 0.3) * step / inertiaScale);
+    this.yawRate = clamp(this.yawRate, -4.4, 4.4);
+
+    this.slipAngle = Math.atan2(lat, absFwd);
+    const catchK = !this.drifting ? clamp((Math.abs(this.slipAngle) - 0.07) / 0.34, 0, 1) * this.stats.catchAssist * opts.gripSurface : 0;
+    if (catchK > 0) {
+      lat *= Math.exp(-catchK * 1.9 * step);
+      this.yawRate *= Math.exp(-catchK * 2.4 * step);
+    }
+
+    const maxLat = this.stats.topSpeed * (this.drifting ? 0.85 : 0.62);
+    lat = clamp(lat, -maxLat, maxLat);
+    this.latAbs = Math.abs(lat);
+    this.slipAngle = Math.atan2(lat, absFwd);
+    this.slipRatio = clamp(Math.abs(this.slipAngle) / 0.42 + this.latAbs / Math.max(1, this.stats.topSpeed) * 0.24, 0, 1.4);
+    this.lateralLoad = clamp(latAccel / 1200, -1.3, 1.3);
+
+    this.heading = wrapAngle(this.heading + this.yawRate * step);
+    const nhx = Math.cos(this.heading), nhy = Math.sin(this.heading);
+    this.vx = nhx * fwd - nhy * lat;
+    this.vy = nhy * fwd + nhx * lat;
+    this.x += this.vx * step;
+    this.y += this.vy * step;
   }
 
   /** Spot just behind the racer (feet / tail / wake) for spark effects. */
@@ -731,20 +907,6 @@ export class Racer {
         this.driftChainT = 0;
       } else if (!driftHeld || this.speed < 60) {
         this.releaseDrift();
-      } else {
-        // soft-drift: holding the line into the corner charges fastest, and each
-        // movement class builds at its own rate (floaters/flyers are specialists)
-        const dp = DRIFT_PROFILE[this.def.cls];
-        const align = clamp(steer * this.driftDir, -1, 1);
-        this.driftCharge += dt * (0.72 + Math.max(align, 0) * 0.6) * dp.charge;
-        const newTier = this.driftCharge >= DRIFT_TIERS[2] ? 3
-          : this.driftCharge >= DRIFT_TIERS[1] ? 2
-            : this.driftCharge >= DRIFT_TIERS[0] ? 1 : 0;
-        if (newTier > this.driftTier) {
-          this.driftTier = newTier;
-          this.driftPerfectT = 0.26; // brief window for a clean-release bonus
-          if (this.isPlayer) Audio.sfx("drifttick");
-        }
       }
     }
 
@@ -755,29 +917,6 @@ export class Racer {
     this.steerSm += (steer - this.steerSm) * Math.min(1, steerRamp * dt);
     if (Math.abs(this.steerSm) < 0.01 && steer === 0) this.steerSm = 0;
     const steerFx = this.steerSm;
-
-    const iceSlick = this.surface === "ice" && !this.def.types.includes("ice");
-    let steerRate = this.stats.turnRate
-      * (this.status.paralysis > 0 ? 0.62 : 1)
-      * (iceSlick ? 0.6 : 1);
-    if (this.drifting) {
-      const dp = DRIFT_PROFILE[this.def.cls];
-      const align = steerFx * this.driftDir; // + steering into the slide, - counter-steering
-      // counter-steerable drift: steer in to tighten the arc, hold neutral to
-      // sweep through, or counter-steer to stand it up and hold a line (even
-      // slightly unwind it) — so a drift works on gentle bends, not just hairpins
-      const turnFactor = 0.6 + Math.max(align, 0) * 0.75 - Math.max(-align, 0) * 0.8;
-      this.heading += this.driftDir * steerRate * dp.turn * turnFactor * dt;
-    } else {
-      // generous low-speed steering so you can always turn away from a wall,
-      // tapering off near top speed so flat-out driving stays stable —
-      // but boosts keep full authority (gotta hold the line on a mushroom)
-      const spdFrac = this.speed / this.stats.topSpeed;
-      const lowBoost = clamp(spdFrac / 0.5, 0.55, 1);
-      const highTaper = this.boostT > 0 ? 1 : 1 - clamp((spdFrac - 0.62) / 0.38, 0, 1) * 0.25;
-      this.heading += steerFx * steerRate * lowBoost * highTaper * dt;
-    }
-    this.heading = wrapAngle(this.heading);
 
     // --- target speed ---
     let surfMult = 1;
@@ -811,59 +950,13 @@ export class Racer {
     const slope = rawSlope * (rawSlope > 0 ? sf.up : sf.down);
     if (slope !== 0) vmax *= clamp(1 - slope * 0.9, 0.8, 1.18);
 
-    // --- acceleration ---
-    let accel = this.stats.accel * throttle;
-    if (this.status.paralysis > 0) accel *= 0.72;
-    if (this.surface === "offroad") accel *= 0.85;
-    const slip = this.drifting ? DRIFT_PROFILE[def.cls].slip * this.driftDir : 0;
-    const moveDir = this.heading - slip;
-    this.vx += Math.cos(moveDir) * accel * dt;
-    this.vy += Math.sin(moveDir) * accel * dt;
-    if (this.boostT > 0) {
-      // boosts snap you up to speed
-      const cs = Math.cos(this.heading), sn = Math.sin(this.heading);
-      const fwdNow = this.vx * cs + this.vy * sn;
-      if (fwdNow < vmax * 0.85) {
-        this.vx += cs * this.stats.accel * 1.6 * dt;
-        this.vy += sn * this.stats.accel * 1.6 * dt;
-      }
-    }
-
-    // --- friction: split forward / lateral ---
-    const hx = Math.cos(this.heading), hy = Math.sin(this.heading);
-    let fwd = this.vx * hx + this.vy * hy;
-    let lat = this.vx * -hy + this.vy * hx;
-
-    this.latAbs = Math.abs(lat); // lateral slip, read by cornering fx/audio
-    let grip = this.stats.grip * (this.drifting ? 0.32 : 1);
-    if (iceSlick) grip *= 0.22;
-    lat *= Math.exp(-grip * dt);
-
-    // gravity pulls along the slope
-    if (slope !== 0) fwd -= slope * 480 * dt;
-
-    if (fwd > vmax) {
-      fwd = lerp(fwd, vmax, 1 - Math.exp(-3.2 * dt));
-    } else if (throttle <= 0.02) {
-      fwd *= Math.exp(-1.1 * dt);
-    }
-    if (inp.brake && raceStarted && !stunned) {
-      fwd -= 520 * dt;
-      if (fwd < -90) fwd = -90;
-    } else if (fwd < 0) {
-      fwd *= Math.exp(-3 * dt);
-    }
-    if (this.status.sleep > 0 || this.status.squash > 0 || this.status.freeze > 0) {
-      fwd *= Math.exp(-6.5 * dt);
-      lat *= Math.exp(-6.5 * dt);
-    }
-
     // paralysis jolts
     if (this.status.paralysis > 0) {
       this.paraJoltT -= dt;
       if (this.paraJoltT <= 0) {
         this.paraJoltT = 0.45;
-        fwd *= 0.9;
+        this.vx *= 0.9;
+        this.vy *= 0.9;
         burst(this.scene, this.x, this.y, { color: 0xfff060, n: 3, spd: 60, size: 4, life: 200 });
       }
     }
@@ -883,11 +976,38 @@ export class Racer {
       }
     }
 
-    this.vx = hx * fwd - hy * lat;
-    this.vy = hy * fwd + hx * lat;
-
-    this.x += this.vx * dt;
-    this.y += this.vy * dt;
+    // --- grip-core physics ---
+    const gripSurface = surfaceGrip(this.surface, def, this.airT > 0, this.offroadFreeT > 0 || this.transform === "dig");
+    let remaining = dt;
+    let substeps = 0;
+    while (remaining > 0 && substeps < 8) {
+      const step = Math.min(HANDLING_STEP, remaining);
+      this.integrateHandlingStep(step, {
+        throttle,
+        brake: inp.brake,
+        raceStarted,
+        stunned,
+        steerFx,
+        vmax,
+        slope,
+        gripSurface
+      });
+      remaining -= step;
+      substeps++;
+    }
+    if (remaining > 0) {
+      this.integrateHandlingStep(remaining, {
+        throttle,
+        brake: inp.brake,
+        raceStarted,
+        stunned,
+        steerFx,
+        vmax,
+        slope,
+        gripSurface
+      });
+    }
+    this.updateDriftCharge(dt, steer);
 
     // --- track projection / progress ---
     const prevS = this.proj.s;

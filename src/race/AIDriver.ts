@@ -129,20 +129,26 @@ export class AIDriver {
       err += this.noiseVal;
     }
 
-    let steer = clamp(err * 2.4, -1, 1);
+    let steer = clamp(err * 2.15, -1, 1);
     let throttle = 1;
-    if (Math.abs(err) > 1.35) throttle = 0.4;
+    if (Math.abs(err) > 1.35) throttle = 0.45;
 
     const hNow = geom.headingAt(wrap01(sNow + 0.004));
     const hFar = geom.headingAt(wrap01(sNow + la * 1.5));
     const curv = Math.abs(wrapAngle(hFar - hNow));
-    if (curv > 1.2 && sp > r.stats.topSpeed * 0.84) throttle = 0.55;
+    if (curv > 1.05 && sp > r.stats.topSpeed * 0.82) throttle = 0.58;
     // rim tracks: boost-stacked speed into a bend means flying off — lift early
     if (def.edgeMode === "fall" && curv > 0.45 && sp > r.stats.topSpeed * 0.98) throttle = Math.min(throttle, 0.62);
     if (jumpAhead) {
       // never lift before a jump — coming up short means falling in
       throttle = 1;
       steer = clamp(err * 1.4, -0.5, 0.5); // gentle corrections only, hold the line
+    }
+
+    const slipK = clamp((Math.abs(r.slipAngle) - 0.08) / 0.34, 0, 1);
+    if (slipK > 0) {
+      steer = clamp(steer + Math.sign(r.slipAngle) * slipK * (r.drifting ? 0.32 : 0.5), -1, 1);
+      if (!r.drifting && slipK > 0.45) throttle = Math.min(throttle, 0.78);
     }
 
     // drift on sustained curves (not near a rim — low drift grip slides wide)
@@ -157,7 +163,7 @@ export class AIDriver {
         || (r.driftTier >= 2 && straightening)
         || (r.driftTier >= 1 && Math.abs(err) < 0.06));
     } else {
-      if (!nearRim && curv > 0.5 && Math.abs(err) > 0.3 && sp > r.stats.topSpeed * 0.66 && r.airT <= 0) {
+      if (!nearRim && curv > 0.42 && Math.abs(err) > 0.28 && sp > r.stats.topSpeed * 0.62 && r.airT <= 0) {
         this.driftHoldT += dt;
       } else {
         this.driftHoldT = 0;

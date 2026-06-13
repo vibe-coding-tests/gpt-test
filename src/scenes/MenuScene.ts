@@ -11,8 +11,7 @@ const OPTIONS = [
   { key: "tt", label: "TIME TRIAL", desc: "Race the clock and your ghost" },
   { key: "dex", label: "POKéDEX", desc: "Your roster — win races to unlock all 151" },
   { key: "help", label: "HOW TO PLAY", desc: "Controls and racing tips" },
-  { key: "controls", label: "CONTROLS", desc: "View and remap your keys" },
-  { key: "cheats", label: "CHEATS", desc: "Debug switches — unlock all, easy rivals, debug keys" }
+  { key: "controls", label: "CONTROLS", desc: "View and remap your keys" }
 ];
 
 export default class MenuScene extends Phaser.Scene {
@@ -71,6 +70,11 @@ export default class MenuScene extends Phaser.Scene {
     kb.on("keydown-DOWN", () => ready() && this.move(1));
     kb.on("keydown-ENTER", () => ready() && this.choose());
     kb.on("keydown-SPACE", () => ready() && this.choose());
+    kb.on("keydown-F9", () => {
+      if (!ready() || this.helpPanel) return;
+      Audio.sfx("select");
+      this.scene.start("Cheats");
+    });
     kb.on("keydown-ESC", () => {
       if (!ready()) return;
       Audio.sfx("back");
@@ -116,7 +120,6 @@ export default class MenuScene extends Phaser.Scene {
     else if (key === "tt") this.scene.start("Select", { flow: "tt" });
     else if (key === "dex") this.scene.start("Pokedex");
     else if (key === "controls") this.scene.start("Controls");
-    else if (key === "cheats") this.scene.start("Cheats");
     else this.showHelp();
   }
 

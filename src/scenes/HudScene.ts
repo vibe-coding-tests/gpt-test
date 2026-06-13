@@ -357,6 +357,8 @@ export default class HudScene extends Phaser.Scene {
         `spd   ${Math.round(p.speed)} / ${Math.round(p.stats.topSpeed)}`,
         `s     ${p.proj.s.toFixed(3)}  d ${Math.round(p.proj.d)}`,
         `surf  ${p.surface}${p.airT > 0 ? " (air)" : ""}`,
+        `slip  ${(p.slipAngle * 57.2958).toFixed(1)}deg  mu ${p.gripMu.toFixed(2)}`,
+        `load  f${p.loadFront.toFixed(2)}  lat ${p.lateralLoad.toFixed(2)}`,
         `boost ${Math.max(0, p.boostT).toFixed(2)}  mult ${p.speedMult.toFixed(2)}`,
         `drift t${p.driftTier} ${p.driftCharge.toFixed(2)}  chain ${p.driftChain}`,
         `rank  ${p.rank}  candies ${p.candies}  stacks ${p.powerStacks}`

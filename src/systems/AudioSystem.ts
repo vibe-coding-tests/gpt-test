@@ -431,7 +431,7 @@ class AudioSys {
    * pacing up with speed, with wind rush while airborne.
    */
   moveLoop(dt: number, o: {
-    cls: string; speedFrac: number; surface: string; airborne: boolean; drifting: boolean;
+    cls: string; speedFrac: number; surface: string; airborne: boolean; drifting: boolean; slip: number;
   }) {
     if (!this.unlocked || Save.muted) return;
 
@@ -446,11 +446,11 @@ class AudioSys {
     if (o.speedFrac < 0.12) return;
 
     // sliding surfaces hiss instead of stepping
-    if (o.surface === "ice" || o.drifting) {
+    if (o.surface === "ice" || o.drifting || o.slip > 0.24) {
       this.windAcc += dt;
       if (this.windAcc > 0.13) {
         this.windAcc = 0;
-        this.noise(0.1, o.drifting ? 0.035 : 0.03, 6200);
+        this.noise(0.1, o.drifting ? 0.035 : 0.018 + Math.min(o.slip, 1) * 0.018, 6200);
       }
       if (o.surface === "ice") return;
     }

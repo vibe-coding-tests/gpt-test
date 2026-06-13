@@ -29,9 +29,14 @@ export interface DerivedStats {
   sp: number; ac: number; hd: number; wt: number; // 0..1 display stats
   topSpeed: number;  // px/s
   accel: number;     // px/s^2
-  turnRate: number;  // rad/s
   mass: number;
-  grip: number;      // lateral friction coefficient
+  gripFront: number; // front axle grip multiplier
+  gripRear: number;  // rear axle grip multiplier
+  steerLock: number; // max front-wheel steer angle, radians
+  wheelbase: number; // handling wheelbase in world px
+  cgFront: number;   // static front load fraction
+  izz: number;       // yaw inertia scalar
+  catchAssist: number; // arcade stability aid for recoverable slides
   radius: number;    // collision radius px
 }
 

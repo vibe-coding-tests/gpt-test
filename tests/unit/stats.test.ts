@@ -16,6 +16,13 @@ describe("Stats", () => {
       expect(stats.wt).toBeLessThanOrEqual(1);
       expect(stats.topSpeed).toBeGreaterThan(300);
       expect(stats.radius).toBeGreaterThan(0);
+      expect(stats.gripFront).toBeGreaterThan(0);
+      expect(stats.gripRear).toBeGreaterThan(0);
+      expect(stats.steerLock).toBeGreaterThan(0);
+      expect(stats.wheelbase).toBeGreaterThan(0);
+      expect(stats.cgFront).toBeGreaterThan(0.3);
+      expect(stats.cgFront).toBeLessThan(0.7);
+      expect(stats.izz).toBeGreaterThan(0);
     }
   });
 
