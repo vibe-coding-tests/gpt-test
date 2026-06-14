@@ -36,6 +36,7 @@ export interface BillOpts {
   show?: boolean;    // logical visibility from the owning manager
   topDepth?: number; // depth used in top-down modes
   m7Boost?: number;  // extra 3D-only scale tweak
+  footprint?: number; // radius used to keep grounded 3D objects clear on slopes
   /** Force a flat billboard even for Pokémon textures (distant flocks). */
   bill?: boolean;
 }
@@ -289,7 +290,7 @@ export class ThreeView {
   // ------------------------------------------------------------- ground
 
   /** Elevation of the world ground plane at a world point (px). */
-  groundH(x: number, y: number): number {
+  groundH(x: number, y: number, opts: { deck?: boolean } = {}): number {
     const def = this.geom.def;
     const p = this.geom.project(x, y);
     let h = 0;
@@ -298,13 +299,23 @@ export class ThreeView {
       const fade = clamp(1 - (Math.abs(p.d) - def.corridorHalf - 40) / 260, 0, 1);
       h = this.geom.heightAt(p.s) * fade;
     }
-    if (this.geom.featureAtProj(p)?.kind === "gap") {
+    if (!opts.deck && this.geom.featureAtProj(p)?.kind === "gap") {
       h -= 520;
     }
     // Open edges/fall tracks drop the terrain away outside the corridor.
     const over = Math.abs(p.d) - (def.corridorHalf + 26);
-    if (over > 0 && this.geom.edgeAt(p.s, p.d).mode === "open") {
+    if (!opts.deck && over > 0 && this.geom.edgeAt(p.s, p.d).mode === "open") {
       h -= Math.pow(clamp(over / 200, 0, 1), 1.6) * 640;
+    }
+    return h;
+  }
+
+  private supportH(x: number, y: number, footprint = 0, deck = false): number {
+    let h = this.groundH(x, y, { deck });
+    const r = Math.max(0, footprint * 0.55);
+    if (r <= 1) return h;
+    for (const [ox, oy] of [[r, 0], [-r, 0], [0, r], [0, -r]] as [number, number][]) {
+      h = Math.max(h, this.groundH(x + ox, y + oy, { deck }));
     }
     return h;
   }
@@ -578,18 +589,26 @@ export class ThreeView {
     this.head = snap ? wantHead : rotLerp(this.head, wantHead, dt * 5.2);
     const peek = p.drifting ? p.driftDir * 0.085 : clamp(p.slipAngle, -0.45, 0.45) * 0.045;
     const h = this.head + peek;
-    this.camX = p.x - Math.cos(h) * this.BACK;
-    this.camY = p.y - Math.sin(h) * this.BACK;
+    const wantX = p.x - Math.cos(h) * this.BACK;
+    const wantY = p.y - Math.sin(h) * this.BACK;
+    if (snap) {
+      this.camX = wantX;
+      this.camY = wantY;
+    } else {
+      const followK = Math.min(1, dt * (p.speed < 90 ? 5.2 : 7.8));
+      this.camX += (wantX - this.camX) * followK;
+      this.camY += (wantY - this.camY) * followK;
+    }
 
     // hills: ride the ground and pitch the horizon with the slope ahead
     let wantHor = this.HOR;
+    let wantCamH = 0;
     if (this.geom.hasHills) {
-      this.camH = this.geom.heightAt(p.proj.s - this.BACK / this.geom.total);
+      wantCamH = this.geom.heightAt(p.proj.s - this.BACK / this.geom.total);
       const slope = this.geom.slopeAt(p.proj.s + 90 / this.geom.total);
       wantHor = this.HOR - clamp(slope * 300, -95, 95);
-    } else {
-      this.camH = 0;
     }
+    this.camH = snap ? wantCamH : this.camH + (wantCamH - this.camH) * Math.min(dt * 5.5, 1);
     this.hor = snap ? wantHor : this.hor + (wantHor - this.hor) * Math.min(dt * 7, 1);
 
     // widen the lens with speed for that tunnel-rush feel
@@ -603,14 +622,15 @@ export class ThreeView {
       cam.updateProjectionMatrix();
       this.lastFov = nextFov;
     }
-    this.smoothedLoad += (p.lateralLoad - this.smoothedLoad) * (snap ? 1 : Math.min(dt * 9, 1));
-    this.smoothedWeight += (p.weightTransfer - this.smoothedWeight) * (snap ? 1 : Math.min(dt * 8, 1));
-    const weightDip = clamp(this.smoothedWeight * 42 + Math.abs(this.smoothedLoad) * 4, -8, 15);
+    const motionK = clamp((p.speed - 35) / 180, 0, 1);
+    this.smoothedLoad += (p.lateralLoad * motionK - this.smoothedLoad) * (snap ? 1 : Math.min(dt * 7, 1));
+    this.smoothedWeight += (p.weightTransfer * motionK - this.smoothedWeight) * (snap ? 1 : Math.min(dt * 6, 1));
+    const weightDip = clamp(this.smoothedWeight * 20 + Math.abs(this.smoothedLoad) * 2, -4, 8);
     const eyeY = this.camH + this.H - weightDip;
     cam.position.set(this.camX, eyeY, this.camY);
     const pitch = Math.atan((GAME_H / 2 - this.hor) / this.Feff); // + looks down
     const D = 300;
-    const roll = clamp(-this.smoothedLoad * 0.027 + (p.drifting ? -p.driftDir * 0.014 : 0), -0.052, 0.052);
+    const roll = clamp((-this.smoothedLoad * 0.018 + (p.drifting ? -p.driftDir * 0.01 : 0)) * motionK, -0.034, 0.034);
     cam.up.set(Math.sin(roll), Math.cos(roll), 0);
     cam.lookAt(
       this.camX + Math.cos(h) * D,
@@ -672,7 +692,8 @@ export class ThreeView {
     }
     b.obj.visible = true;
 
-    const gy = this.groundH(wx, wy);
+    const deck = !o.flat && lift > 0.5;
+    const gy = this.supportH(wx, wy, o.footprint ?? 0, deck);
     const boost = o.m7Boost ?? 1;
 
     if (b.kind === "rig") {
@@ -829,7 +850,7 @@ export class ThreeView {
     lift: number, sc: number, scY: number, o: BillOpts
   ) {
     const g = b.obj;
-    g.position.set(wx, gy + lift, wy);
+    g.position.set(wx, gy + lift + 1.2, wy);
     // models are built facing +Z; world heading h faces (cos h, sin h) in XZ
     if (o.face !== undefined) {
       g.rotation.y = Math.PI / 2 - o.face;

@@ -308,7 +308,7 @@ export default class HudScene extends Phaser.Scene {
     const t = race.countdownT;
     if (!race.raceStarted) {
       const n = t > 2.2 ? (t > 3.2 ? "" : "3") : t > 1.2 ? "2" : "1";
-      this.countText.setText(n).setColor("#ffd23a");
+      this.countText.setText(n ? `${n}${t <= 1.15 ? "\nHOLD ACCEL" : ""}` : "").setColor(t <= 1.15 ? "#fff0a0" : "#ffd23a");
     } else if (this.goShownT < 0.9) {
       this.goShownT += dt;
       this.countText.setText("GO!").setColor("#9ad05a");
@@ -323,7 +323,7 @@ export default class HudScene extends Phaser.Scene {
     if (p.status.freeze > 0) status = "FROZEN!";
     else if (p.status.sleep > 0) status = "ASLEEP!";
     else if (p.status.squash > 0) status = "SQUASHED!";
-    else if (p.status.confuse > 0) status = "CONFUSED! (REVERSED)";
+    else if (p.status.confuse > 0) status = "CONFUSED! (WOBBLY)";
     else if (p.status.paralysis > 0) status = "PARALYZED!";
     else if (p.status.burn > 0) status = "BURNED!";
     else if (p.status.poison > 0) status = "POISONED!";

@@ -77,4 +77,31 @@ describe("TrackGeometry", () => {
       geom.surfaceAtProj({ s: spot!.s, d: spot!.d, idx: 0 })
     );
   });
+
+  test("all tracks place starting grids on solid drivable terrain", () => {
+    const solid = new Set(["road", "boost", "ramp", "ice", "mud", "offroad"]);
+
+    for (const track of TRACKS) {
+      const geom = new TrackGeometry(track);
+      for (let slot = 0; slot < 8; slot++) {
+        const grid = geom.startGrid(slot);
+        const surface = geom.surfaceAtProj({ s: grid.s, d: grid.d, idx: 0 });
+        expect(solid.has(surface), `${track.name} grid slot ${slot} starts on ${surface}`).toBe(true);
+      }
+    }
+  });
+
+  test("gap hitboxes across all tracks have matching ramp approaches", () => {
+    for (const track of TRACKS) {
+      for (const gap of track.features.filter((feature) => feature.kind === "gap")) {
+        const hasRampApproach = track.features.some((feature) => {
+          if (feature.kind !== "ramp") return false;
+          const touchesStart = wrappedDelta(feature.s1, gap.s0) < 0.008;
+          const overlapsLaterally = Math.min(feature.d1, gap.d1) - Math.max(feature.d0, gap.d0) > 8;
+          return touchesStart && overlapsLaterally;
+        });
+        expect(hasRampApproach, `${track.name} gap ${gap.s0}-${gap.s1} needs a ramp approach`).toBe(true);
+      }
+    }
+  });
 });

@@ -359,8 +359,8 @@ export class Racer {
         this.status.leech = 2.6 * f;
         break;
       case "confuse":
-        this.status.confuse = 1.4 * f;
-        mercy = this.status.confuse + 1.4;
+        this.status.confuse = 1.0 * f;
+        mercy = this.status.confuse + 0.8;
         Audio.sfx("confuse");
         burst(this.scene, this.x, this.y - 20, { color: 0xf0a8ff, n: 8, spd: 80, size: 4 });
         if (this.isPlayer) floatText(this.scene, this.x, this.y - 30, "CONFUSED!", "#f0a8ff", 14);
@@ -884,8 +884,11 @@ export class Racer {
     this.stunnedPrev = stunned;
     const inp = this.input;
     const throttle = raceStarted && !stunned ? inp.throttle : 0;
-    // confusion mirrors the wheel — left is right until it wears off
-    const steer = (raceStarted && !stunned ? inp.steer : 0) * (this.status.confuse > 0 ? -1 : 1);
+    const baseSteer = raceStarted && !stunned ? inp.steer : 0;
+    // Confusion scrambles the wheel without fully hard-reversing every input.
+    const steer = this.status.confuse > 0
+      ? clamp(baseSteer * -0.55 + Math.sin(this.bobPhase * 3.1 + this.index) * 0.12 * Math.abs(baseSteer), -1, 1)
+      : baseSteer;
     const driftHeld = raceStarted && !stunned ? inp.drift : false;
 
     const onGround = this.airT <= 0;
@@ -1236,6 +1239,7 @@ export class Racer {
     const dugIn = this.transform === "dig"; // underground: only the dirt mound shows
     this.view.submit(this.sprite, this.x, this.y, {
       show: !hideMe && !dugIn, face, rot: lean, scale: sx, scaleY: sy, lift,
+      footprint: this.radius,
       topDepth: 5 + this.index * 0.01
     });
     if (dugIn && Math.random() < dt * 22) {
@@ -1279,7 +1283,7 @@ export class Racer {
       this.shieldImg.setAlpha(0.5 + Math.sin(this.bobPhase * 4) * 0.2);
     }
     this.view.submit(this.shieldImg, this.x, this.y, {
-      show: this.shieldT > 0, scale: this.shieldS, lift, topDepth: 7
+      show: this.shieldT > 0, scale: this.shieldS, lift, footprint: this.radius, topDepth: 7
     });
   }
 

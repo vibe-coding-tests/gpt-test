@@ -1769,11 +1769,24 @@ export function buildMonRig(sp: number, height: number): MonRig {
 
   const group = new THREE.Group();
   built.root.scale.multiplyScalar(height);
+  built.root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(built.root);
   group.add(built.root);
   const levitates = !!(built.levitate || spec.levitate);
+  const baseY = Math.max(0, -bounds.min.y) + 1.2;
+  const hoverY = levitates ? height * 0.07 : 0;
+  built.root.position.y = baseY + hoverY;
   const seed = Math.random() * 9;
   let t = seed;
   const tmp = new THREE.Color();
+  const floorBox = new THREE.Box3();
+  const keepAboveFloor = () => {
+    group.updateMatrixWorld(true);
+    floorBox.setFromObject(group);
+    const localMinY = floorBox.min.y - group.position.y;
+    if (localMinY < 0.75) built.root.position.y += 0.75 - localMinY;
+  };
+  keepAboveFloor();
 
   return {
     group,
@@ -1788,7 +1801,8 @@ export function buildMonRig(sp: number, height: number): MonRig {
         const k = 1 + Math.sin(t * 13 + f.position.x * 7 + seed) * 0.16;
         f.scale.set(1, k, 1);
       }
-      if (levitates) built.root.position.y = Math.sin(t * 1.8 + seed) * 0.05 * height;
+      if (levitates) built.root.position.y = baseY + hoverY + Math.sin(t * 1.8 + seed) * height * 0.035;
+      keepAboveFloor();
     },
     setOpacity(o: number) {
       for (const r of mats) {

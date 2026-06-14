@@ -57,6 +57,8 @@ export default class RaceScene extends Phaser.Scene {
   camRot = 0;
   isBattle = false;
   battleTimer = 0;
+  private topCamX = 0;
+  private topCamY = 0;
   private prevAlive = 0;
   private lapFloor = new Map<Racer, number>();
   private cheatItemIdx = 0;
@@ -558,15 +560,20 @@ export default class RaceScene extends Phaser.Scene {
       Audio.cry(this.player.def.id, 0.7);
       Audio.playBgm(this.trackDef.musicId);
 
-      // player rocket start
+      // player rocket start: hold accelerate late in the final beat.
       const h = this.playerAuto ? 0.3 : this.holdStart;
-      if (h >= 0 && h <= 0.5) {
-        this.player.applyBoost(1.45, 1.25, "rocket");
+      if (h >= 0 && h <= 0.65) {
+        this.player.applyBoost(1.48, 1.35, "rocket");
+        this.player.vx += Math.cos(this.player.heading) * 150;
+        this.player.vy += Math.sin(this.player.heading) * 150;
         this.hud()?.toast("ROCKET START!", "#ffd23a");
         burst(this, this.player.x, this.player.y, { color: 0xffd23a, n: 10, spd: 130 });
-      } else if (h > 0.5 && h <= 1.1) {
-        this.player.applyBoost(1.2, 0.7, "boost1");
-      } else if (h > 1.6) {
+      } else if (h > 0.65 && h <= 1.15) {
+        this.player.applyBoost(1.24, 0.8, "boost1");
+        this.player.vx += Math.cos(this.player.heading) * 75;
+        this.player.vy += Math.sin(this.player.heading) * 75;
+        this.hud()?.toast("GOOD START!", "#ffd86a");
+      } else if (h > 1.15) {
         Audio.sfx("wrongstart");
         this.hud()?.toast("TOO EAGER...", "#ff8a8a");
       }
@@ -752,7 +759,9 @@ export default class RaceScene extends Phaser.Scene {
       this.camRot = 0;
     } else {
       cam.setZoom(1.05);
-      cam.centerOn(this.player.x, this.player.y);
+      this.topCamX = this.player.x;
+      this.topCamY = this.player.y;
+      cam.centerOn(this.topCamX, this.topCamY);
       this.camRot = this.view.mode === "rotate" ? -(this.player.heading + Math.PI / 2) : 0;
       cam.setRotation(this.camRot);
     }
@@ -773,7 +782,12 @@ export default class RaceScene extends Phaser.Scene {
 
     const speedFrac = p.speed / p.stats.topSpeed;
     const ahead = Math.min(80, p.speed * 0.16);
-    cam.centerOn(p.x + Math.cos(p.heading) * ahead, p.y + Math.sin(p.heading) * ahead);
+    const wantX = p.x + Math.cos(p.heading) * ahead;
+    const wantY = p.y + Math.sin(p.heading) * ahead;
+    const followK = Math.min(1, dt * (this.raceStarted ? 6.8 : 10));
+    this.topCamX += (wantX - this.topCamX) * followK;
+    this.topCamY += (wantY - this.topCamY) * followK;
+    cam.centerOn(this.topCamX, this.topCamY);
     const targetRot = this.view.mode === "rotate" ? -(p.heading + Math.PI / 2) : 0;
     this.camRot = rotLerp(this.camRot, targetRot, dt * 4.2);
     cam.setRotation(this.camRot);
