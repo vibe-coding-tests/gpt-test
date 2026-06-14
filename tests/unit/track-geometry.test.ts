@@ -55,8 +55,12 @@ describe("TrackGeometry", () => {
     const route = new TrackGeometry(TRACKS[0]);
     expect(route.isRailAt(0.2, "right")).toBe(true);
     expect(route.isRailAt(0.2, "left")).toBe(false);
-    expect(route.edgeAt(0.52, -route.def.corridorHalf - 20).penalty).toBe("heavy");
+    expect(route.edgeAt(0.52, -route.def.corridorHalf - 20).penalty).toBe("normal");
     expect(route.surfaceAtProj({ s: 0.52, d: -route.def.corridorHalf - 20, idx: 0 })).toBe("wall");
+
+    const cerulean = new TrackGeometry(TRACKS[2]);
+    expect(cerulean.surfaceAtProj({ s: 0.4, d: -cerulean.def.corridorHalf - 20, idx: 0 })).toBe("gap");
+    expect(cerulean.surfaceAtProj({ s: 0.5, d: cerulean.def.corridorHalf + 20, idx: 0 })).toBe("wall");
 
     const indigo = new TrackGeometry(TRACKS[8]);
     expect(indigo.surfaceAtProj({ s: 0.1, d: indigo.def.corridorHalf + 20, idx: 0 })).toBe("wall");

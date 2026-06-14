@@ -67,7 +67,7 @@ export interface Shortcut {
 
 export type EdgeSide = "left" | "right" | "both";
 export type EdgeMode = "wall" | "guardrail" | "open";
-export type EdgePenalty = "normal" | "heavy";
+export type EdgePenalty = "normal";
 
 export interface EdgeSegment {
   s0: number;
@@ -91,6 +91,10 @@ export type DecoKind =
   | "forest" | "plain" | "beach" | "cave" | "volcano" | "ice" | "city" | "rocky" | "space"
   | "ghost" | "moon" | "plant";
 
+export type WallStyle =
+  | "posts" | "hedge" | "shore" | "stone" | "lava" | "ice"
+  | "neon" | "rock" | "space" | "ghost" | "moon" | "energy";
+
 /** Gaussian elevation bump: peak h (world px) at lap position s, half-width w (s-fraction). */
 export interface Hill {
   s: number;
@@ -105,6 +109,7 @@ export interface TrackTheme {
   road: number;
   roadEdge: number;
   wall: number;      // rail posts
+  wallStyle: WallStyle;
   deco: DecoKind;
   dark?: boolean;
   rainbowRoad?: boolean;
@@ -120,8 +125,6 @@ export interface TrackDef {
   roadHalf: number;
   corridorHalf: number;
   edgeMode: "wall" | "fall";
-  /** On "fall" tracks: s-ranges with guardrails that bounce you back instead. */
-  rails?: { s0: number; s1: number }[];
   /** Segment-level edge overrides for guardrails, walls, or open/fall edges. */
   edgeSegments?: EdgeSegment[];
   offroadKind: OffroadKind;

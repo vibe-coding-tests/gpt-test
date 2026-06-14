@@ -19,14 +19,14 @@ export const TRACKS: TrackDef[] = [
     corridorHalf: 300,
     edgeMode: "wall",
     edgeSegments: [
-      { s0: 0.16, s1: 0.3, side: "right", mode: "guardrail", penalty: "normal" },
-      { s0: 0.48, s1: 0.58, side: "left", mode: "guardrail", penalty: "heavy" },
-      { s0: 0.78, s1: 0.9, side: "both", mode: "guardrail", penalty: "normal" }
+      { s0: 0.16, s1: 0.3, side: "right", mode: "guardrail" },
+      { s0: 0.48, s1: 0.58, side: "left", mode: "guardrail" },
+      { s0: 0.78, s1: 0.9, side: "both", mode: "guardrail" }
     ],
     offroadKind: "grass",
     theme: {
       bg: 0x4f9e43, bgDetail: 0x3f8a36, corridor: 0x67b257,
-      road: 0xc8b18a, roadEdge: 0xf5ead2, wall: 0x8a5a32, deco: "plain"
+      road: 0xc8b18a, roadEdge: 0xf5ead2, wall: 0x8a5a32, wallStyle: "posts", deco: "plain"
     },
     features: [
       { kind: "boost", s0: 0.44, s1: 0.465, d0: -110, d1: 110 },
@@ -67,7 +67,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "grass",
     theme: {
       bg: 0x2e6b2a, bgDetail: 0x245722, corridor: 0x47913c,
-      road: 0xb39a76, roadEdge: 0xe8dcb8, wall: 0x4a3a22, deco: "forest"
+      road: 0xb39a76, roadEdge: 0xe8dcb8, wall: 0x4a3a22, wallStyle: "hedge", deco: "forest"
     },
     features: [
       { kind: "mud", s0: 0.22, s1: 0.27, d0: -88, d1: 30 },
@@ -111,10 +111,15 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 140,
     corridorHalf: 320,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.36, s1: 0.47, side: "left", mode: "open" },
+      { s0: 0.76, s1: 0.88, side: "right", mode: "open" },
+      { s0: 0.48, s1: 0.56, side: "both", mode: "guardrail" }
+    ],
     offroadKind: "sand",
     theme: {
       bg: 0xe8d8a8, bgDetail: 0xd8c890, corridor: 0xf0e0b8,
-      road: 0xb8a888, roadEdge: 0xfff8e0, wall: 0x6890c0, deco: "beach"
+      road: 0xb8a888, roadEdge: 0xfff8e0, wall: 0x6890c0, wallStyle: "shore", deco: "beach"
     },
     features: [
       { kind: "water", s0: 0.14, s1: 0.27, d0: -320, d1: 320 },   // first lagoon crossing
@@ -163,7 +168,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "rock",
     theme: {
       bg: 0x2a2433, bgDetail: 0x221d2b, corridor: 0x453b52,
-      road: 0x6a5f78, roadEdge: 0x9a8ab0, wall: 0x15121c, deco: "cave", dark: true
+      road: 0x6a5f78, roadEdge: 0x9a8ab0, wall: 0x15121c, wallStyle: "stone", deco: "cave", dark: true
     },
     features: [
       // choco-island mud bog gauntlet
@@ -214,7 +219,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "rock",
     theme: {
       bg: 0x4a2a22, bgDetail: 0x3a1f18, corridor: 0x66392c,
-      road: 0x8a7368, roadEdge: 0xc8a888, wall: 0x2a1510, deco: "volcano", dark: true
+      road: 0x8a7368, roadEdge: 0xc8a888, wall: 0x2a1510, wallStyle: "lava", deco: "volcano", dark: true
     },
     features: [
       { kind: "ramp", s0: 0.285, s1: 0.3, d0: -102, d1: 102 },
@@ -258,7 +263,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "snow",
     theme: {
       bg: 0xbcd8e8, bgDetail: 0xa8c8dc, corridor: 0xd8ecf4,
-      road: 0x90b8cc, roadEdge: 0xffffff, wall: 0x5888a8, deco: "ice"
+      road: 0x90b8cc, roadEdge: 0xffffff, wall: 0x5888a8, wallStyle: "ice", deco: "ice"
     },
     features: [
       { kind: "ice", s0: 0.12, s1: 0.2, d0: -100, d1: 100 },
@@ -300,10 +305,15 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 118,
     corridorHalf: 240,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.03, s1: 0.22, side: "both", mode: "guardrail" },
+      { s0: 0.47, s1: 0.53, side: "both", mode: "wall" },
+      { s0: 0.7, s1: 0.84, side: "right", mode: "guardrail" }
+    ],
     offroadKind: "rock",
     theme: {
       bg: 0x12142e, bgDetail: 0x0d0f24, corridor: 0x222448,
-      road: 0x32355c, roadEdge: 0xe858c8, wall: 0x080a18, deco: "city", dark: true
+      road: 0x32355c, roadEdge: 0xe858c8, wall: 0x080a18, wallStyle: "neon", deco: "city", dark: true
     },
     features: [
       { kind: "boost", s0: 0.06, s1: 0.1, d0: -96, d1: -22 },   // left traffic lane
@@ -352,10 +362,15 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 120,
     corridorHalf: 230,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.32, s1: 0.39, side: "both", mode: "guardrail" },
+      { s0: 0.59, s1: 0.74, side: "both", mode: "guardrail" },
+      { s0: 0.84, s1: 0.9, side: "left", mode: "wall" }
+    ],
     offroadKind: "rock",
     theme: {
       bg: 0x453438, bgDetail: 0x382a2e, corridor: 0x5e4a4e,
-      road: 0x7a6a70, roadEdge: 0xd8a868, wall: 0x241a1c, deco: "rocky", dark: true
+      road: 0x7a6a70, roadEdge: 0xd8a868, wall: 0x241a1c, wallStyle: "rock", deco: "rocky", dark: true
     },
     features: [
       // weave between the moats
@@ -415,7 +430,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "space",
     theme: {
       bg: 0x140f2e, bgDetail: 0x0d0a20, corridor: 0x241d4a,
-      road: 0x584a9a, roadEdge: 0xffffff, wall: 0x9a8ae0, deco: "space",
+      road: 0x584a9a, roadEdge: 0xffffff, wall: 0x9a8ae0, wallStyle: "space", deco: "space",
       dark: true, rainbowRoad: true
     },
     features: [
@@ -472,7 +487,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "rock",
     theme: {
       bg: 0x171228, bgDetail: 0x110d1f, corridor: 0x2c2342,
-      road: 0x4a3c58, roadEdge: 0x8a7aa8, wall: 0x6a5a9a, deco: "ghost", dark: true
+      road: 0x4a3c58, roadEdge: 0x8a7aa8, wall: 0x6a5a9a, wallStyle: "ghost", deco: "ghost", dark: true
     },
     features: [
       { kind: "ramp", s0: 0.28, s1: 0.295, d0: -104, d1: 104 },
@@ -517,10 +532,15 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 122,
     corridorHalf: 260,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.2, s1: 0.31, side: "both", mode: "guardrail" },
+      { s0: 0.52, s1: 0.64, side: "left", mode: "guardrail" },
+      { s0: 0.74, s1: 0.82, side: "right", mode: "wall" }
+    ],
     offroadKind: "rock",
     theme: {
       bg: 0x2a2548, bgDetail: 0x221e3c, corridor: 0x3c3660,
-      road: 0x6a6490, roadEdge: 0xd8d4f0, wall: 0x1a1830, deco: "moon", dark: true
+      road: 0x6a6490, roadEdge: 0xd8d4f0, wall: 0x1a1830, wallStyle: "moon", deco: "moon", dark: true
     },
     features: [
       { kind: "boost", s0: 0.255, s1: 0.275, d0: -100, d1: 100 }, // crest dash — launches off the summit
@@ -567,10 +587,15 @@ export const TRACKS: TrackDef[] = [
     roadHalf: 135,
     corridorHalf: 300,
     edgeMode: "wall",
+    edgeSegments: [
+      { s0: 0.0, s1: 0.08, side: "both", mode: "guardrail" },
+      { s0: 0.53, s1: 0.61, side: "both", mode: "guardrail" },
+      { s0: 0.78, s1: 0.91, side: "right", mode: "wall" }
+    ],
     offroadKind: "rock",
     theme: {
       bg: 0x101a1c, bgDetail: 0x0a1416, corridor: 0x1c2a2c,
-      road: 0x2e3a40, roadEdge: 0xf0d048, wall: 0x060c0e, deco: "plant", dark: true
+      road: 0x2e3a40, roadEdge: 0xf0d048, wall: 0x060c0e, wallStyle: "energy", deco: "plant", dark: true
     },
     features: [
       { kind: "boost", s0: 0.01, s1: 0.06, d0: -135, d1: 135 },  // the plunger launch
@@ -621,14 +646,14 @@ export const TRACKS: TrackDef[] = [
     corridorHalf: 235,
     edgeMode: "wall",
     edgeSegments: [
-      { s0: 0.08, s1: 0.18, side: "both", mode: "guardrail", penalty: "normal" },
-      { s0: 0.42, s1: 0.52, side: "left", mode: "wall", penalty: "heavy" },
-      { s0: 0.76, s1: 0.86, side: "right", mode: "guardrail", penalty: "normal" }
+      { s0: 0.08, s1: 0.18, side: "both", mode: "guardrail" },
+      { s0: 0.42, s1: 0.52, side: "left", mode: "wall" },
+      { s0: 0.76, s1: 0.86, side: "right", mode: "guardrail" }
     ],
     offroadKind: "grass",
     theme: {
       bg: 0x4f9e43, bgDetail: 0x3f8a36, corridor: 0x67b257,
-      road: 0xc8b18a, roadEdge: 0xf5ead2, wall: 0x8a5a32, deco: "plain"
+      road: 0xc8b18a, roadEdge: 0xf5ead2, wall: 0x8a5a32, wallStyle: "posts", deco: "plain"
     },
     features: [
       { kind: "ramp", s0: 0.115, s1: 0.13, d0: -200, d1: 200 },  // launch over the fountain mound
@@ -672,7 +697,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "space",
     theme: {
       bg: 0x23233f, bgDetail: 0x1a1a30, corridor: 0x323252,
-      road: 0x4a4a6e, roadEdge: 0x9a9ac8, wall: 0x15152a, deco: "moon", dark: true
+      road: 0x4a4a6e, roadEdge: 0x9a9ac8, wall: 0x15152a, wallStyle: "moon", deco: "moon", dark: true
     },
     features: [
       { kind: "ramp", s0: 0.165, s1: 0.18, d0: -190, d1: 190 },  // crater-lip launch
@@ -719,7 +744,7 @@ export const TRACKS: TrackDef[] = [
     offroadKind: "rock",
     theme: {
       bg: 0x3a1d16, bgDetail: 0x2c140f, corridor: 0x4e2a1c,
-      road: 0x6a4632, roadEdge: 0xf0b048, wall: 0x241008, deco: "volcano", dark: true
+      road: 0x6a4632, roadEdge: 0xf0b048, wall: 0x241008, wallStyle: "lava", deco: "volcano", dark: true
     },
     features: [
       { kind: "lava", s0: 0.08, s1: 0.13, d0: -205, d1: -60 },   // shore pools

@@ -5,6 +5,10 @@ import { ALL_IDS, getPokemon, POKEMON } from "../../src/data/pokemonData";
 import { TRACKS } from "../../src/data/trackData";
 
 const DEFENSIVE_CATS = new Set(["stance", "guard", "transform"]);
+const WALL_STYLES = new Set([
+  "posts", "hedge", "shore", "stone", "lava", "ice",
+  "neon", "rock", "space", "ghost", "moon", "energy"
+]);
 
 describe("data integrity", () => {
   test("contains the original 151 Pokemon exactly once", () => {
@@ -55,6 +59,7 @@ describe("data integrity", () => {
       expect(track.roadHalf, track.name).toBeGreaterThan(0);
       expect(track.corridorHalf, track.name).toBeGreaterThanOrEqual(track.roadHalf);
       expect(track.laps, track.name).toBeGreaterThan(0);
+      expect(WALL_STYLES.has(track.theme.wallStyle), track.name).toBe(true);
 
       for (const feature of track.features) {
         expect(feature.s0, track.name).toBeGreaterThanOrEqual(0);
@@ -78,7 +83,14 @@ describe("data integrity", () => {
         expect(edge.s1, track.name).toBeLessThanOrEqual(1);
         expect(["left", "right", "both", undefined]).toContain(edge.side);
         expect(["wall", "guardrail", "open"]).toContain(edge.mode);
-        expect(["normal", "heavy", undefined]).toContain(edge.penalty);
+        expect(["normal", undefined]).toContain(edge.penalty);
+      }
+
+      if (track.edgeMode === "fall") {
+        expect(
+          (track.edgeSegments ?? []).some((edge) => edge.mode === "guardrail" || edge.mode === "wall"),
+          `${track.name} needs protected fall-track rail segments`
+        ).toBe(true);
       }
     }
   });

@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import type { Feature } from "../types";
+import type { EdgeMode, Feature, WallStyle } from "../types";
 import { Rng, clamp, wrap01 } from "../util";
 import { TrackGeometry } from "./TrackGeometry";
 
@@ -108,6 +108,194 @@ export interface TrackWorld {
   stamp(x: number, y: number, rot: number, w: number, h: number, color: number, alpha: number): void;
   /** Re-upload the canvas to whichever renderer is active. Cheap to throttle. */
   flush(toPhaser: boolean): boolean;
+}
+
+type BoundarySample = {
+  x: number; y: number;
+  tx: number; ty: number;
+  ox: number; oy: number;
+  mode: EdgeMode;
+};
+
+function fillDiamond(g: D2, x: number, y: number, tx: number, ty: number, ox: number, oy: number, r: number, color: number, alpha = 1) {
+  g.fillStyle(color, alpha);
+  g.fillPoints([
+    { x: x + ox * r, y: y + oy * r },
+    { x: x + tx * r * 0.85, y: y + ty * r * 0.85 },
+    { x: x - ox * r, y: y - oy * r },
+    { x: x - tx * r * 0.85, y: y - ty * r * 0.85 }
+  ]);
+}
+
+function fillOrientedRect(g: D2, x: number, y: number, tx: number, ty: number, ox: number, oy: number, w: number, h: number, color: number, alpha = 1) {
+  const hw = w / 2, hh = h / 2;
+  g.fillStyle(color, alpha);
+  g.fillPoints([
+    { x: x - tx * hw - ox * hh, y: y - ty * hw - oy * hh },
+    { x: x + tx * hw - ox * hh, y: y + ty * hw - oy * hh },
+    { x: x + tx * hw + ox * hh, y: y + ty * hw + oy * hh },
+    { x: x - tx * hw + ox * hh, y: y - ty * hw + oy * hh }
+  ]);
+}
+
+function boundaryColors(style: WallStyle, wall: number, roadEdge: number) {
+  switch (style) {
+    case "hedge": return { rail: 0x2f7d32, post: 0x1f5c25, glow: 0x86d76a, open: 0xfff1a8 };
+    case "shore": return { rail: 0xeaf8ff, post: 0x2f87c8, glow: 0x7fd8ff, open: 0x1d6fb8 };
+    case "stone": return { rail: shadeNum(wall, 1.45), post: shadeNum(wall, 1.15), glow: 0x8c7aa8, open: 0xd8c8ff };
+    case "lava": return { rail: 0xff8a2a, post: wall, glow: 0xffd060, open: 0xff5a24 };
+    case "ice": return { rail: 0xffffff, post: 0x8fd8ff, glow: 0xd8f8ff, open: 0x68b8ff };
+    case "neon": return { rail: roadEdge, post: 0x151a38, glow: 0xff8ae8, open: 0xffe66a };
+    case "rock": return { rail: shadeNum(roadEdge, 0.95), post: wall, glow: 0xe0a050, open: 0xffd080 };
+    case "space": return { rail: 0xffffff, post: wall, glow: 0xa88cff, open: 0xfff8ff };
+    case "ghost": return { rail: 0xb9a8ff, post: wall, glow: 0xd9d0ff, open: 0xe8dcff };
+    case "moon": return { rail: 0xcfd0ff, post: wall, glow: 0x8aa8ff, open: 0xd8e8ff };
+    case "energy": return { rail: roadEdge, post: 0x062426, glow: 0xfff08a, open: 0xffe050 };
+    default: return { rail: roadEdge, post: wall, glow: shadeNum(roadEdge, 1.25), open: 0xffd86a };
+  }
+}
+
+function drawBoundaryMarker(g: D2, style: WallStyle, colors: ReturnType<typeof boundaryColors>, s: BoundarySample, k: number) {
+  const guardrail = s.mode === "guardrail";
+  const base = guardrail ? colors.rail : colors.post;
+  const pulse = (k % 16) < 8;
+  switch (style) {
+    case "hedge":
+      g.fillStyle(colors.post, 1).fillCircle(s.x, s.y, guardrail ? 7 : 6);
+      g.fillStyle(colors.glow, 0.45).fillCircle(s.x - s.tx * 3, s.y - s.ty * 3, 3);
+      break;
+    case "shore":
+      g.lineStyle(3, colors.rail, 0.9).strokeCircle(s.x, s.y, guardrail ? 6 : 5);
+      g.fillStyle(colors.post, 0.95).fillCircle(s.x, s.y, guardrail ? 3.5 : 3);
+      break;
+    case "stone":
+      fillOrientedRect(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, guardrail ? 16 : 12, guardrail ? 9 : 8, base, 1);
+      g.fillStyle(colors.glow, 0.45).fillCircle(s.x + s.ox * 2, s.y + s.oy * 2, 2);
+      break;
+    case "lava":
+      g.fillStyle(colors.glow, 0.35).fillCircle(s.x, s.y, guardrail ? 9 : 7);
+      g.fillStyle(colors.post, 1).fillCircle(s.x, s.y, guardrail ? 5 : 4);
+      g.fillStyle(colors.rail, 0.9).fillCircle(s.x + s.ox * 1.5, s.y + s.oy * 1.5, 2);
+      break;
+    case "ice":
+      fillDiamond(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, guardrail ? 7 : 5.5, colors.glow, 0.95);
+      fillDiamond(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, guardrail ? 4 : 3, colors.post, 0.8);
+      break;
+    case "neon":
+      g.fillStyle(colors.glow, guardrail ? 0.45 : 0.28).fillCircle(s.x, s.y, guardrail ? 9 : 6);
+      fillOrientedRect(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, guardrail ? 14 : 10, 5, base, 1);
+      break;
+    case "rock":
+      fillOrientedRect(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, pulse ? 14 : 10, pulse ? 10 : 8, base, 1);
+      break;
+    case "space":
+      g.fillStyle(colors.glow, guardrail ? 0.55 : 0.3).fillCircle(s.x, s.y, guardrail ? 7 : 5);
+      fillDiamond(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, guardrail ? 5 : 3.5, colors.rail, 0.95);
+      break;
+    case "ghost":
+      g.fillStyle(colors.glow, 0.25).fillCircle(s.x, s.y, guardrail ? 10 : 7);
+      g.fillStyle(base, 0.9).fillCircle(s.x, s.y, guardrail ? 5 : 3.5);
+      g.fillStyle(0xffffff, 0.65).fillCircle(s.x - s.tx * 1.5, s.y - s.ty * 1.5, 1.2);
+      break;
+    case "moon":
+      fillDiamond(g, s.x, s.y, s.tx, s.ty, s.ox, s.oy, guardrail ? 6.5 : 5, base, 1);
+      g.fillStyle(colors.glow, 0.45).fillCircle(s.x + s.ox * 2, s.y + s.oy * 2, 2.4);
+      break;
+    case "energy":
+      g.fillStyle(colors.glow, guardrail ? 0.55 : 0.35).fillCircle(s.x, s.y, guardrail ? 8 : 6);
+      g.fillStyle(base, 1).fillCircle(s.x, s.y, guardrail ? 4.5 : 3.5);
+      g.lineStyle(2, colors.rail, 0.7).lineBetween(s.x - s.tx * 6, s.y - s.ty * 6, s.x + s.tx * 6, s.y + s.ty * 6);
+      break;
+    default:
+      g.fillStyle(base, 1).fillCircle(s.x, s.y, guardrail ? 5 : 4);
+      break;
+  }
+}
+
+function drawOpenMarker(g: D2, colors: ReturnType<typeof boundaryColors>, s: BoundarySample) {
+  g.fillStyle(colors.open, 0.8);
+  g.fillTriangle(
+    s.x + s.ox * 7, s.y + s.oy * 7,
+    s.x - s.ox * 5 + s.tx * 6, s.y - s.oy * 5 + s.ty * 6,
+    s.x - s.ox * 5 - s.tx * 6, s.y - s.oy * 5 - s.ty * 6
+  );
+}
+
+function drawBoundaries(g: D2, geom: TrackGeometry) {
+  const def = geom.def;
+  const N = geom.xs.length;
+  const style = def.theme.wallStyle;
+  const colors = boundaryColors(style, def.theme.wall, def.theme.roadEdge);
+  const modes = (k: number, side: number): EdgeMode =>
+    geom.edgeAt(k / N, side * (def.corridorHalf + 12)).mode;
+  const sample = (k: number, side: number, inset: number): BoundarySample => {
+    const kk = ((k % N) + N) % N;
+    const d = side * (def.corridorHalf - inset);
+    return {
+      x: geom.xs[kk] + geom.nx[kk] * d,
+      y: geom.ys[kk] + geom.ny[kk] * d,
+      tx: geom.tx[kk],
+      ty: geom.ty[kk],
+      ox: geom.nx[kk] * side,
+      oy: geom.ny[kk] * side,
+      mode: modes(kk, side)
+    };
+  };
+  const strokeWhere = (wanted: readonly EdgeMode[], width: number, color: number, alpha: number, inset: number) => {
+    for (const side of [-1, 1]) {
+      let open = false;
+      g.lineStyle(width, color, alpha);
+      g.beginPath();
+      for (let k = 0; k <= N; k++) {
+        const kk = k % N;
+        const mode = modes(kk, side);
+        if (wanted.includes(mode)) {
+          const p = sample(kk, side, inset);
+          if (!open) { g.moveTo(p.x, p.y); open = true; }
+          else g.lineTo(p.x, p.y);
+        } else if (open) {
+          g.strokePath();
+          g.beginPath();
+          open = false;
+        }
+      }
+      if (open) g.strokePath();
+    }
+  };
+
+  const protectedModes: EdgeMode[] = ["wall", "guardrail"];
+  if (["neon", "energy", "space", "ghost"].includes(style)) {
+    strokeWhere(protectedModes, 14, colors.glow, 0.18, 3);
+    strokeWhere(protectedModes, 6, colors.rail, 0.9, 3);
+  } else if (style === "lava") {
+    strokeWhere(protectedModes, 12, colors.glow, 0.22, 3);
+    strokeWhere(protectedModes, 5, colors.rail, 0.82, 3);
+  } else if (style === "hedge") {
+    strokeWhere(protectedModes, 10, colors.post, 0.9, 4);
+    strokeWhere(["guardrail"], 4, colors.glow, 0.75, 4);
+  } else if (style === "shore" || style === "ice") {
+    strokeWhere(protectedModes, 8, colors.rail, 0.72, 3);
+    strokeWhere(["guardrail"], 3, colors.glow, 0.9, 3);
+  } else {
+    strokeWhere(protectedModes, 7, shadeNum(colors.post, 0.9), 0.82, 3);
+    strokeWhere(["guardrail"], 4, colors.rail, 0.9, 3);
+  }
+  strokeWhere(["open"], 2, colors.open, def.edgeMode === "fall" ? 0.35 : 0.55, 10);
+
+  for (let k = 0; k < N; k += 6) {
+    for (const side of [-1, 1]) {
+      const mode = modes(k, side);
+      if (mode === "open") continue;
+      drawBoundaryMarker(g, style, colors, sample(k, side, 3), k);
+    }
+  }
+  for (let k = 0; k < N; k += 10) {
+    for (const side of [-1, 1]) {
+      const mode = modes(k, side);
+      if (mode !== "open") continue;
+      drawOpenMarker(g, colors, sample(k, side, 10));
+    }
+  }
 }
 
 /**
@@ -362,59 +550,8 @@ export function buildTrackWorld(scene: Phaser.Scene, geom: TrackGeometry): Track
     }
   }
 
-  // --- guardrail sections: a bright continuous rail where geometry says the
-  // edge is protected, including one-sided segment overrides.
-  if (def.edgeMode === "fall" || def.edgeSegments?.length) {
-    for (const side of [-1, 1]) {
-      const sideName = side < 0 ? "left" : "right";
-      g.lineStyle(6, def.theme.roadEdge, 0.95);
-      let open = false;
-      g.beginPath();
-      for (let k = 0; k <= N; k++) {
-        const kk = k % N;
-        if (geom.isRailAt(kk / N, sideName)) {
-          const d = side * (def.corridorHalf - 2);
-          const x = geom.xs[kk] + geom.nx[kk] * d;
-          const y = geom.ys[kk] + geom.ny[kk] * d;
-          if (!open) { g.moveTo(x, y); open = true; }
-          else g.lineTo(x, y);
-        } else if (open) {
-          g.strokePath();
-          g.beginPath();
-          open = false;
-        }
-      }
-      if (open) g.strokePath();
-    }
-    // rail posts
-    for (let k = 0; k < N; k += 6) {
-      for (const side of [-1, 1]) {
-        const sideName = side < 0 ? "left" : "right";
-        if (!geom.isRailAt(k / N, sideName)) continue;
-        const d = side * (def.corridorHalf - 2);
-        g.fillStyle(def.theme.wall, 1);
-        g.fillCircle(geom.xs[k] + geom.nx[k] * d, geom.ys[k] + geom.ny[k] * d, 5);
-      }
-    }
-  }
-
-  // --- rails / edge markers ---
-  for (let k = 0; k < N; k += 8) {
-    for (const side of [-1, 1]) {
-      const sideName = side < 0 ? "left" : "right";
-      if (geom.isRailAt(k / N, sideName)) continue; // rail drawn above
-      const d = side * (def.corridorHalf - 4);
-      const x = geom.xs[k] + geom.nx[k] * d;
-      const y = geom.ys[k] + geom.ny[k] * d;
-      if (def.edgeMode === "fall") {
-        g.fillStyle(def.theme.wall, 0.85);
-        g.fillCircle(x, y, 2.5);
-      } else {
-        g.fillStyle(def.theme.wall, 1);
-        g.fillCircle(x, y, 4);
-      }
-    }
-  }
+  // --- styled walls, guardrails, and open-edge warning marks ---
+  drawBoundaries(g, geom);
 
   drawDecorations(g, geom, rng);
 

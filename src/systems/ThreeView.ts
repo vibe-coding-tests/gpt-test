@@ -344,6 +344,77 @@ export class ThreeView {
       this.scene3.add(apron);
       this.disposables.push(apron.geometry, apron.material as THREE.Material);
     }
+    this.buildBoundaryRibbons(theme);
+  }
+
+  private buildBoundaryRibbons(theme: TrackTheme) {
+    const def = this.geom.def;
+    const N = this.geom.xs.length;
+    const step = 8;
+    const heightByStyle: Record<TrackTheme["wallStyle"], number> = {
+      posts: 26,
+      hedge: 34,
+      shore: 22,
+      stone: 38,
+      lava: 30,
+      ice: 34,
+      neon: 28,
+      rock: 40,
+      space: 24,
+      ghost: 26,
+      moon: 32,
+      energy: 30
+    };
+    const colorByStyle: Partial<Record<TrackTheme["wallStyle"], number>> = {
+      neon: theme.roadEdge,
+      energy: theme.roadEdge,
+      space: theme.roadEdge,
+      ice: 0xd8f8ff,
+      lava: 0xff8a2a,
+      shore: 0xeaf8ff,
+      ghost: 0xb9a8ff
+    };
+    const h = heightByStyle[theme.wallStyle];
+    const verts: number[] = [];
+    const pushQuad = (ax: number, ay: number, az: number, bx: number, by: number, bz: number) => {
+      verts.push(
+        ax, ay, az,
+        bx, by, bz,
+        bx, by + h, bz,
+        ax, ay, az,
+        bx, by + h, bz,
+        ax, ay + h, az
+      );
+    };
+
+    for (const side of [-1, 1]) {
+      for (let k = 0; k < N; k += step) {
+        const k2 = (k + step) % N;
+        const modeA = this.geom.edgeAt(k / N, side * (def.corridorHalf + 12)).mode;
+        const modeB = this.geom.edgeAt(k2 / N, side * (def.corridorHalf + 12)).mode;
+        if (modeA === "open" || modeB === "open") continue;
+        const d = side * (def.corridorHalf - 3);
+        const ax = this.geom.xs[k] + this.geom.nx[k] * d;
+        const az = this.geom.ys[k] + this.geom.ny[k] * d;
+        const bx = this.geom.xs[k2] + this.geom.nx[k2] * d;
+        const bz = this.geom.ys[k2] + this.geom.ny[k2] * d;
+        pushQuad(ax, this.groundH(ax, az) + 2, az, bx, this.groundH(bx, bz) + 2, bz);
+      }
+    }
+    if (!verts.length) return;
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    geo.computeVertexNormals();
+    const mat = new THREE.MeshBasicMaterial({
+      color: colorByStyle[theme.wallStyle] ?? shade(theme.wall, 1.12),
+      transparent: true,
+      opacity: theme.dark ? 0.78 : 0.86,
+      side: THREE.DoubleSide
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    this.scene3.add(mesh);
+    this.disposables.push(geo, mat);
   }
 
   // ---------------------------------------------------------------- sky

@@ -344,11 +344,6 @@ export class TrackGeometry {
       if (!sideMatches(seg.side, side)) continue;
       if (seg.mode === "guardrail" || seg.mode === "wall") return true;
     }
-    const rails = this.def.rails;
-    if (!rails) return false;
-    for (const r of rails) {
-      if (TrackGeometry.inRange(s, r.s0, r.s1)) return true;
-    }
     return false;
   }
 

@@ -1062,7 +1062,6 @@ export class Racer {
 
     if (rawSurface === "wall") {
       const edge = this.geom.edgeAt(this.proj.s, this.proj.d);
-      const heavyWall = edge.penalty === "heavy";
       const ch = this.geom.corridorHalfAt(this.proj.s, this.proj.d) - 6;
       const cl = clamp(this.proj.d, -ch, ch);
       const p = this.geom.posOf(this.proj.s, cl);
@@ -1075,13 +1074,12 @@ export class Racer {
       if (vn > 0) {
         this.vx -= sN.nx * outSign * vn;
         this.vy -= sN.ny * outSign * vn;
-        const bleed = heavyWall ? 0.72 : 0.82;
-        this.vx *= bleed; this.vy *= bleed;
-        this.wallPenaltyT = Math.max(this.wallPenaltyT, heavyWall ? 0.7 : 0.45);
+        this.vx *= 0.82; this.vy *= 0.82;
+        this.wallPenaltyT = Math.max(this.wallPenaltyT, 0.45);
         if (this.speed > 150 && this.bumpCd <= 0) {
-          this.bumpCd = heavyWall ? 0.55 : 0.4;
+          this.bumpCd = 0.4;
           if (this.isPlayer) Audio.sfx("bump");
-          burst(this.scene, this.x, this.y, { color: heavyWall ? 0xffd080 : 0xcccccc, n: heavyWall ? 6 : 4, spd: 70, size: 4, life: 220 });
+          burst(this.scene, this.x, this.y, { color: edge.mode === "guardrail" ? this.geom.def.theme.roadEdge : 0xcccccc, n: 4, spd: 70, size: 4, life: 220 });
         }
       }
       this.surface = "offroad";
