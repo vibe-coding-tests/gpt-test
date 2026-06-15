@@ -1,12 +1,13 @@
 import Phaser from "phaser";
 import { Racer } from "./Racer";
 import { TrackGeometry } from "../systems/TrackGeometry";
-import { ensurePokemonTexture } from "../systems/SpriteFactory";
+import { ensurePokemonTexture, ensurePokemonTextureFromDef } from "../systems/SpriteFactory";
 import { Rng, clamp, wrap01 } from "../util";
 import { Audio } from "../systems/AudioSystem";
 import { burst, boltStrike, floatText, ringPulse } from "../systems/effects";
 import type { AvoidPoint, CandySpot } from "./AIDriver";
 import type { ThreeView } from "../systems/ThreeView";
+import type { PokemonDef } from "../types";
 
 interface Candy extends CandySpot {
   img: Phaser.GameObjects.Image;
@@ -87,6 +88,60 @@ interface FirePatch {
   life: number;
 }
 
+type CameoKind = "hooh" | "celebi" | "lugia";
+type CameoZoneKind = "hooh-fire" | "lugia-gale";
+
+interface Cameo {
+  kind: CameoKind;
+  sprite: Phaser.GameObjects.Sprite;
+  s: number;
+  d: number;
+  side: number;
+  t: number;
+  life: number;
+  actionT: number;
+  wx: number;
+  wy: number;
+}
+
+interface CameoZone {
+  kind: CameoZoneKind;
+  img: Phaser.GameObjects.Image;
+  ring: Phaser.GameObjects.Image;
+  x: number;
+  y: number;
+  s: number;
+  d: number;
+  r: number;
+  life: number;
+  armT: number;
+  windX: number;
+  windY: number;
+  hitCd: Map<Racer, number>;
+}
+
+interface CameoPickup extends CandySpot {
+  img: Phaser.GameObjects.Image;
+  kind: "celebi-seed";
+  life: number;
+  phase: number;
+}
+
+const CAMEO_DEFS: Record<CameoKind, PokemonDef> = {
+  hooh: {
+    id: 250, name: "Ho-Oh", types: ["fire", "flying"], cls: "flyer", size: 2, shape: "bird",
+    body: "#d9482f", belly: "#f6d46b", accent: "#45a56c", evos: [], evosRemaining: 0, stage: 0, legendary: true
+  },
+  celebi: {
+    id: 251, name: "Celebi", types: ["psychic", "grass"], cls: "floater", size: 0, shape: "biped",
+    body: "#8bdc8b", belly: "#d8ffd0", accent: "#3ca878", evos: [], evosRemaining: 0, stage: 0, legendary: true
+  },
+  lugia: {
+    id: 249, name: "Lugia", types: ["psychic", "flying"], cls: "flyer", size: 2, shape: "bird",
+    body: "#d8eef8", belly: "#ffffff", accent: "#5870c8", evos: [], evosRemaining: 0, stage: 0, legendary: true
+  }
+};
+
 export class HazardManager {
   scene: Phaser.Scene;
   geom: TrackGeometry;
@@ -99,12 +154,16 @@ export class HazardManager {
   electrodes: Electrode[] = [];
   boulders: Boulder[] = [];
   firePatches: FirePatch[] = [];
+  cameos: Cameo[] = [];
+  cameoZones: CameoZone[] = [];
+  cameoPickups: CameoPickup[] = [];
   rng: Rng;
   elapsed = 0;
   onPlayerCandy?: (count: number) => void;
   private shadowTexW: number;
   private shadowTexH: number;
   private ringTexW: number;
+  private nextCameoT = 0;
 
   private get view(): ThreeView {
     return (this.scene as Phaser.Scene & { view: ThreeView }).view;
@@ -119,6 +178,7 @@ export class HazardManager {
     this.shadowTexW = sh.width;
     this.shadowTexH = sh.height;
     this.ringTexW = scene.textures.get("fx-ring").getSourceImage().width;
+    this.nextCameoT = this.rng.range(8, 16);
 
     for (const c of geom.def.candies) {
       const p = geom.posOf(c.s, c.d);
@@ -534,6 +594,158 @@ export class HazardManager {
         burst(this.scene, b.wx, b.wy, { color: 0x8a8a82, n: 8, spd: 100, size: 5 });
       }
     }
+
+    this.updateCameos(dt, raceStarted);
+  }
+
+  private updateCameos(dt: number, raceStarted: boolean) {
+    for (let i = this.cameoPickups.length - 1; i >= 0; i--) {
+      const p = this.cameoPickups[i];
+      p.life -= dt;
+      if (!p.active || p.life <= 0) { p.img.destroy(); this.cameoPickups.splice(i, 1); continue; }
+      p.img.setAlpha(clamp(p.life / 1.2, 0, 1));
+      this.view.submit(p.img, p.x, p.y, {
+        scale: 1 + Math.sin(this.elapsed * 5 + p.phase) * 0.16,
+        rot: this.elapsed * 2 + p.phase,
+        lift: 5 + Math.sin(this.elapsed * 3 + p.phase) * 3,
+        topDepth: 3
+      });
+      for (const r of this.racers) {
+        if (r.falling || r.finished || r.eliminated) continue;
+        const dx = r.x - p.x, dy = r.y - p.y;
+        if (dx * dx + dy * dy >= (r.radius + 18) * (r.radius + 18)) continue;
+        p.active = false;
+        r.cleanseStatus();
+        r.applyBoost(1.28, 1.25, r.isPlayer ? "recover" : undefined);
+        r.status.invuln = Math.max(r.status.invuln, 0.65);
+        r.gainEnergy(22);
+        ringPulse(this.scene, p.x, p.y, 0x8af0c8, 74);
+        burst(this.scene, p.x, p.y, { color: 0x8af0c8, n: 12, spd: 90, size: 5 });
+        if (r.isPlayer) floatText(this.scene, r.x, r.y - 30, "TIME SEED!", "#8af0c8", 14);
+        break;
+      }
+    }
+
+    for (let i = this.cameoZones.length - 1; i >= 0; i--) {
+      const z = this.cameoZones[i];
+      const wasArmed = z.armT > 0;
+      z.life -= dt;
+      z.armT = Math.max(0, z.armT - dt);
+      for (const [r, cd] of z.hitCd) {
+        const next = cd - dt;
+        if (next <= 0) z.hitCd.delete(r); else z.hitCd.set(r, next);
+      }
+      if (z.life <= 0) { z.img.destroy(); z.ring.destroy(); this.cameoZones.splice(i, 1); continue; }
+      const color = z.kind === "hooh-fire" ? 0xff8a3a : 0xcfe8ff;
+      if (z.armT > 0) {
+        z.ring.setAlpha(0.35 + Math.sin(this.elapsed * 18) * 0.25);
+        this.view.submit(z.ring, z.x, z.y, { flat: true, scale: ((z.r * 1.4) / this.ringTexW), topDepth: 2 });
+        this.view.submit(z.img, z.x, z.y, { show: false });
+        continue;
+      }
+      if (wasArmed) {
+        Audio.sfx(z.kind === "hooh-fire" ? "ember" : "updraft");
+        ringPulse(this.scene, z.x, z.y, color, z.r + 22);
+        burst(this.scene, z.x, z.y, { color, n: z.kind === "hooh-fire" ? 14 : 10, spd: 130, size: 6 });
+      }
+      z.ring.setVisible(false);
+      z.img.setAlpha(clamp(z.life / 0.7, 0, z.kind === "hooh-fire" ? 0.72 : 0.58));
+      this.view.submit(z.img, z.x, z.y, {
+        flat: true,
+        scale: (z.r * 2.25) / 64 * (1 + Math.sin(this.elapsed * 8 + z.x) * 0.08),
+        rot: z.kind === "lugia-gale" ? this.elapsed * 1.8 : 0,
+        topDepth: 2
+      });
+      for (const r of this.racers) {
+        if (r.falling || r.finished || r.eliminated || z.hitCd.has(r)) continue;
+        if (z.kind === "hooh-fire" && (r.airT > 0 || r.def.cls === "flyer")) continue;
+        const dx = r.x - z.x, dy = r.y - z.y;
+        if (dx * dx + dy * dy >= (z.r + r.radius) * (z.r + r.radius)) continue;
+        z.hitCd.set(r, z.kind === "hooh-fire" ? 0.9 : 0.55);
+        if (z.kind === "hooh-fire") {
+          const landed = r.applyHit("spin", "fire");
+          if (landed) r.applyHit("burn", "fire", true);
+          if (r.isPlayer) this.scene.cameras.main.shake(130, 0.004);
+        } else {
+          r.vx += z.windX * 410;
+          r.vy += z.windY * 410;
+          r.applyHit("spin", "flying", false, 0.7);
+          burst(this.scene, r.x, r.y, { color: 0xcfe8ff, n: 7, spd: 90, size: 5 });
+          if (r.isPlayer) { this.scene.cameras.main.shake(120, 0.0035); floatText(this.scene, r.x, r.y - 32, "AERO BLAST!", "#cfe8ff", 14); }
+        }
+      }
+    }
+
+    if (raceStarted) {
+      this.nextCameoT -= dt;
+      if (this.nextCameoT <= 0 && this.cameos.length < 1) {
+        const kind = this.rng.pick(["hooh", "celebi", "lugia"] as CameoKind[]);
+        const player = this.racers.find((r) => r.isPlayer) ?? this.racers[0];
+        const side = this.rng.next() < 0.5 ? -1 : 1;
+        const minD = this.geom.def.corridorHalf + (kind === "celebi" ? 72 : 118);
+        let spot: { s: number; d: number; x: number; y: number; heading: number } | null = null;
+        for (let tries = 0; tries < 18; tries++) {
+          const s = wrap01((player?.proj.s ?? this.rng.next()) + this.rng.range(0.12, 0.4));
+          const d = side * this.rng.range(minD, minD + (kind === "celebi" ? 90 : 150));
+          const p = this.geom.posOf(s, d);
+          if (p.x < 40 || p.y < 40 || p.x > this.geom.worldW - 40 || p.y > this.geom.worldH - 40) continue;
+          if (this.geom.onCourse(p.x, p.y, 70)) continue;
+          spot = { ...p, s, d };
+          break;
+        }
+        if (spot) {
+          const key = ensurePokemonTextureFromDef(this.scene, `cameo-${kind}`, CAMEO_DEFS[kind]);
+          const sprite = this.scene.add.sprite(spot.x, spot.y, key, 0).setDepth(8.8);
+          sprite.setTint(kind === "hooh" ? 0xffe070 : kind === "celebi" ? 0xa8ffb0 : 0xcfe8ff);
+          this.scene.time.delayedCall(220, () => sprite.clearTint());
+          this.cameos.push({ kind, sprite, s: spot.s, d: spot.d, side, t: 0, life: this.rng.range(7.5, 11.5), actionT: this.rng.range(1.2, 2.3), wx: spot.x, wy: spot.y });
+          Audio.sfx(kind === "celebi" ? "leaf" : kind === "lugia" ? "updraft" : "ember");
+          if (player?.isPlayer) floatText(this.scene, spot.x, spot.y - 44, `${CAMEO_DEFS[kind].name} cameo!`, "#ffffff", 13);
+        }
+        this.nextCameoT = this.rng.range(15, 28);
+      }
+    }
+
+    for (let i = this.cameos.length - 1; i >= 0; i--) {
+      const c = this.cameos[i];
+      c.t += dt;
+      c.life -= dt;
+      c.actionT -= dt;
+      c.s = wrap01(c.s + ((c.kind === "lugia" ? 74 : c.kind === "hooh" ? 122 : 54) / this.geom.total) * dt);
+      c.d += Math.sin(c.t * 0.7) * 9 * dt * c.side;
+      const p = this.geom.posOf(c.s, c.d);
+      c.wx = p.x; c.wy = p.y;
+      if (c.actionT <= 0 && raceStarted) {
+        const live = this.racers.filter((r) => !r.finished && !r.eliminated && !r.falling);
+        const target = live.length ? this.rng.pick(live) : null;
+        if (c.kind === "celebi" && target) {
+          Audio.sfx("leaf");
+          for (let n = 0; n < 3; n++) {
+            const spot = this.geom.nearestSafeSpot(wrap01(target.proj.s + this.rng.range(0.015, 0.11)), this.rng.range(-0.72, 0.72) * this.geom.def.roadHalf, { roadOnly: true, margin: 26, sSearchPx: 420, stepPx: 14, surfaces: ["road", "boost", "ramp", "ice", "mud"] });
+            if (!spot) continue;
+            const img = this.scene.add.image(spot.x, spot.y, "fx-spark").setDepth(3).setTint(0x8af0c8);
+            this.cameoPickups.push({ kind: "celebi-seed", img, x: spot.x, y: spot.y, s: spot.s, d: spot.d, active: true, life: 8.5, phase: this.rng.range(0, Math.PI * 2) });
+          }
+        } else if (target) {
+          const s = wrap01(target.proj.s + target.speed * (c.kind === "lugia" ? 0.8 : 0.55) / this.geom.total);
+          const d = clamp(target.proj.d + this.rng.range(-0.28, 0.28) * this.geom.def.roadHalf, -this.geom.def.roadHalf * 0.86, this.geom.def.roadHalf * 0.86);
+          const spot = this.geom.nearestSafeSpot(s, d, { roadOnly: true, margin: 26, sSearchPx: 360, stepPx: 16, surfaces: ["road", "boost", "ramp", "ice", "mud"] });
+          const pos = spot ?? this.geom.posOf(s, d);
+          const sm = this.geom.sample(spot ? spot.s : s);
+          const gustSide = this.rng.next() < 0.5 ? -1 : 1;
+          const kind: CameoZoneKind = c.kind === "hooh" ? "hooh-fire" : "lugia-gale";
+          const color = kind === "hooh-fire" ? 0xff8a3a : 0xcfe8ff;
+          this.cameoZones.push({ kind, img: this.scene.add.image(pos.x, pos.y, "fx-cloud").setDepth(2).setTint(color).setAlpha(0), ring: this.scene.add.image(pos.x, pos.y, "fx-ring").setDepth(2).setTint(color).setAlpha(0.85), x: pos.x, y: pos.y, s: spot ? spot.s : s, d: spot ? spot.d : d, r: kind === "hooh-fire" ? 54 : 76, life: kind === "hooh-fire" ? 2.4 : 1.7, armT: kind === "hooh-fire" ? 0.9 : 1.05, windX: sm.nx * gustSide, windY: sm.ny * gustSide, hitCd: new Map() });
+          Audio.sfx("warn");
+        }
+        c.actionT = c.kind === "celebi" ? this.rng.range(2.7, 4.3) : this.rng.range(2.0, 3.4);
+      }
+      c.sprite.setFrame(Math.floor(c.t * (c.kind === "celebi" ? 6 : 4.5)) % 3);
+      c.sprite.setAlpha(clamp(c.life, 0, 1));
+      const bob = Math.sin(c.t * (c.kind === "celebi" ? 3.4 : 2.1)) * (c.kind === "celebi" ? 5 : 8);
+      this.view.submit(c.sprite, c.wx, c.wy, { bill: true, face: p.heading, lift: (c.kind === "celebi" ? 52 : 124) + bob, scale: c.kind === "celebi" ? 0.78 : c.kind === "lugia" ? 1.25 : 1.12, topDepth: 8.8, m7Boost: 1.05 });
+      if (c.life <= 0) { burst(this.scene, c.wx, c.wy, { color: c.kind === "hooh" ? 0xffd23a : c.kind === "celebi" ? 0x8af0c8 : 0xcfe8ff, n: 8, spd: 70, size: 6, life: 340 }); c.sprite.destroy(); this.cameos.splice(i, 1); }
+    }
   }
 
   /** Resolve a legendary bird's telegraphed attack. */
@@ -569,7 +781,7 @@ export class HazardManager {
   }
 
   candySpots(): CandySpot[] {
-    return this.candies;
+    return [...this.candies, ...this.cameoPickups];
   }
 
   avoidPoints(): AvoidPoint[] {
@@ -593,6 +805,7 @@ export class HazardManager {
       if (b.rolling) pts.push({ x: b.wx, y: b.wy, r: 34 });
     }
     for (const fp of this.firePatches) pts.push({ x: fp.x, y: fp.y, r: fp.r + 8 });
+    for (const z of this.cameoZones) pts.push({ x: z.x, y: z.y, r: z.r + 10 });
     return pts;
   }
 
@@ -605,5 +818,8 @@ export class HazardManager {
     for (const e of this.electrodes) e.sprite.destroy();
     for (const b of this.boulders) { b.sprite.destroy(); b.shadow.destroy(); }
     for (const fp of this.firePatches) fp.img.destroy();
+    for (const c of this.cameos) c.sprite.destroy();
+    for (const z of this.cameoZones) { z.img.destroy(); z.ring.destroy(); }
+    for (const p of this.cameoPickups) p.img.destroy();
   }
 }

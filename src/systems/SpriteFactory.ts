@@ -12,6 +12,12 @@ export function ensurePokemonTexture(scene: Phaser.Scene, id: number): string {
   const key = `pk-${id}`;
   if (scene.textures.exists(key)) return key;
   const def = getPokemon(id);
+  return ensurePokemonTextureFromDef(scene, key, def);
+}
+
+/** Procedural sprite sheet for cameo-only Pokémon that are not roster entries. */
+export function ensurePokemonTextureFromDef(scene: Phaser.Scene, key: string, def: PokemonDef): string {
+  if (scene.textures.exists(key)) return key;
   const canvas = document.createElement("canvas");
   canvas.width = PK_FRAME * 3;
   canvas.height = PK_FRAME;
