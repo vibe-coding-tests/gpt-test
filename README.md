@@ -1,5 +1,9 @@
 # PokéKart — Kanto Grand Prix
 
+> **Note:** This project exists primarily as a testbed for the Cursor /
+> long-running agent harness setup. The game is the workload; the real
+> point is exercising the agent harness on a sizable, evolving codebase.
+
 A Mario Kart-style browser racer starring the original 151 Pokémon. No karts:
 every Pokémon races with its own movement style — runners sprint, flyers hover
 over gaps, floaters glide across rough ground, swimmers surge through water,
