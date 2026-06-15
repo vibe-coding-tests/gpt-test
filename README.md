@@ -78,11 +78,13 @@ back out — from a race all the way up to the title screen.
   trophy opens Ultra. Trophies award legendaries: the birds for a
   Master Ball Cup podium, Mewtwo for Ultra Ball Cup gold, and Mew for
   sweeping all four cups.
-- **Cheats** — an optional debug menu (off by default, saved between
-  sessions): unlock everything, easy rivals, infinite items, in-race debug
-  keys (`1` cycle item · `2` +1 candy · `3` evolve · `4` boost · `5` warp
-  ahead), and a live telemetry overlay (fps / speed / track position /
-  surface). Toggling cheats never touches your real Pokédex progress.
+- **Cheats** — a hidden debug menu (off by default, saved between
+  sessions), opened from any menu or mid-race with **F9** so it never
+  clutters normal navigation: unlock everything, easy rivals, infinite
+  items, in-race debug keys (`1` cycle item · `2` +1 candy · `3` evolve ·
+  `4` boost · `5` warp ahead, only bound when the DEBUG KEYS cheat is on),
+  and a live telemetry overlay (fps / speed / track position / surface).
+  Toggling cheats never touches your real Pokédex progress.
 
 ### Signature moves
 
@@ -135,11 +137,19 @@ UNLOCKED** the moment one opens. AI rivals fight back with the same system.
 ### Racing mechanics
 
 - Race-start countdown with rocket-start timing (hold ↑ right as GO! flashes)
+- **Grip-core handling**: a progressive arcade tire model with load shift
+  front-to-rear, so grip is its own thing separate from speed — push too hard
+  or hit ice/offroad and the body slides, but slides are recoverable, not a
+  death sentence. You feel the back end step out and catch it
 - Drift mini-turbos (3 tiers) you steer through and counter-steer to hold a
   line; chain slides to stack a reserve of boost, with a perfect-release bonus
   for letting go right as a tier locks in. Each movement class drifts its own
   way — floaters and flyers charge fastest, heavies slide least. Plus
   slipstream draft boosts
+- **Shortcuts**: every track hides a drivable shortcut corridor — a tempting
+  off-line that cuts the lap if you commit to it, with softer offroad
+  penalties inside the corridor (some are mud, some are flat-out boost
+  strips) so the risk-reward is real but the line stays raceable
 - 14 items, all Pokémon moves, weighted by position — and rubber-banded by
   gap: fall far behind the leader and your rolls come from one or two
   positions further back than you really are, so the pack always has a way
@@ -227,7 +237,11 @@ UNLOCKED** the moment one opens. AI rivals fight back with the same system.
   wild Pokémon loiter in the scenery and cry out as you pass; flocks of
   Pidgey, Spearow or Zubat wheel overhead (Staryu in space, Magnemite at
   the Power Plant); and every track hides one oversized cameo in the far
-  background — find Gyarados off Cerulean Cape or Mewtwo above Indigo
+  background — find Gyarados off Cerulean Cape or Mewtwo above Indigo.
+  Mid-race, rarer **roaming legendary cameos** drop in and actually play
+  with the field — Ho-Oh scorches a fire patch onto the road, Lugia whips
+  up a gale that shoves racers off line, and Celebi scatters healing seeds
+  worth grabbing
 - Richer ground art: hand-mottled terrain and asphalt, red-and-white rumble
   strips on sharp bends, and starting-grid slot brackets
 
