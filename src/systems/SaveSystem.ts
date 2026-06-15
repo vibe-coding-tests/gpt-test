@@ -48,7 +48,7 @@ function defaults(): SaveBlob {
   };
 }
 
-class SaveSystem {
+export class SaveSystem {
   data: SaveBlob;
 
   constructor() {

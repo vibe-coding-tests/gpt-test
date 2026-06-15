@@ -24,8 +24,8 @@ runtime — no external assets, no backend. Progress saves to `localStorage`.
 ## Run it
 
 ```bash
-git clone https://github.com/char-boomer-remakes/pokekart.git
-cd pokekart
+git clone https://github.com/vibe-coding-tests/gpt-test.git
+cd gpt-test
 npm install
 npm run dev
 ```

@@ -8,7 +8,7 @@ PokéKart is ~14.6k lines of TypeScript running a real-time 3D racer on Phaser 3
 
 1. **Per-frame allocations and redundant geometry work.** The hot loop allocates hundreds of short-lived objects every frame and rebuilds projection/lookAt math that rarely changes. At 8 racers plus scenery, the Three.js scene issues roughly 450–1000+ draw calls per frame with one rig and one material set built per racer instead of shared.
 2. **Simulation is welded to the renderer.** `Racer` takes a `Phaser.Scene` in its constructor and owns its own sprites and audio calls (`src/race/Racer.ts:1`, `:138`). You cannot run the physics without a browser and a Phaser scene. That single fact blocks headless unit tests, deterministic replays, and any profiling that isn't "watch the FPS counter."
-3. **Testing and build health are thin.** The production build is currently **red** (`tsc --noEmit` fails, see §9). The only tests are 4 Playwright end-to-end flows plus 1 screenshot diagnostic. The genuinely pure logic (`Stats.ts`, `util.ts`, `TrackGeometry.ts`, the data tables) has zero unit tests.
+3. **Sim-level testing is still thin.** The production build now typechecks green (`tsc --noEmit` passes; the old `viewMode` mismatch in §9/E1 is fixed). Unit tests cover the pure modules (`Stats.ts`, `util.ts`, `TrackGeometry.ts`, `SaveSystem.ts`, `GameState.ts`, `movesData.ts`, data tables), but deeper sim-level coverage (full race, items, moves, AI) is still blocked by the Phaser/Three coupling.
 
 These connect. Decoupling the simulation from the renderer is the keystone: it unlocks headless tests *and* makes the per-frame allocation cleanup safe to do, because you can assert the sim still behaves identically.
 
@@ -20,8 +20,8 @@ Measured by reading the code on this branch. Fill in the empty metric cells once
 
 | Area | Observation | Evidence |
 |---|---|---|
-| Build | `npm run build` fails typecheck | `src/scenes/RaceScene.ts:106` vs `src/systems/SaveSystem.ts:6` |
-| Tests | 4 e2e flows + 1 diagnostic; no unit tests | `tests/game.spec.ts`, `tests/diag.spec.ts` |
+| Build | `npm run build` typechecks green | `tsc --noEmit` passes (E1 `viewMode` fix landed) |
+| Tests | 9 unit test files (75 cases) + 2 e2e files; no sim-level tests | `tests/unit/`, `tests/game.spec.ts`, `tests/controls.spec.ts` |
 | Test runtime | `fullyParallel: false`, `workers: 1` | `playwright.config.ts:7` |
 | Frame loop | No FPS cap; runs at `requestAnimationFrame` | `src/main.ts:15` (no `fps` config) |
 | Draw calls / frame | ~450–1000+ in chase view | §5 inventory |
@@ -185,20 +185,22 @@ Expose `race.step(dt, inputs)` that advances the sim with no rendering, plus a w
 
 ## 8. Workstream D: Testing strategy
 
-Today: 4 Playwright flows (boot, menu→race, settings persistence, save load) and 1 screenshot diagnostic. They run against the Vite dev server, so they never typecheck the build, and they need a real WebGL context (swiftshader). Good as smoke tests, too slow and too coarse for logic coverage.
+Today: 2 Playwright spec files covering boot, menu→race, loading states, cheats persistence, save load, and key remapping. They run against the Vite dev server, so they never typecheck the build, and they need a real WebGL context (swiftshader). Good as smoke tests, too slow and too coarse for logic coverage. Nine unit test files already cover `util.ts`, `Stats.ts`, `TrackGeometry.ts`, `SaveSystem.ts`, `GameState.ts`, `movesData.ts`, data integrity, 3D model floor clearance, and handling physics.
 
-Add three layers below the e2e layer.
+Add two more layers below the e2e layer.
 
-### D1. Unit tests for pure logic — start here, no refactor needed
+### D1. Unit tests for pure logic — done
 
-These modules are already pure and testable today:
+These modules are pure and already have unit test coverage:
 
 - `src/systems/Stats.ts`: `deriveStats` (stat ranges, stage multiplier, class bases), `typeEffect` (Gen-1 chart: electric vs ground = 0, fire vs grass = 2, stacked types multiply), `offroadMult`, `waterMult`.
 - `src/util.ts`: `clamp`, `lerp`, `wrap01`, `wrapAngle`, `rotLerp`, `Rng` (deterministic sequence for a fixed seed), `fmtTime`, `ordinal`.
 - `src/systems/TrackGeometry.ts`: `project` round-trips (`posOf(s,d)` then `project` returns ~`(s,d)`), arc-length monotonicity, `inRange` wrap-around, `surfaceAtProj` boundaries, `nearestSafeSpot` returns a safe surface.
-- `src/systems/SaveSystem.ts`: unlock-order progression, XP→move-unlock thresholds, trophy reward rules (`recordTrophy`), loadout filtering, save round-trip via a `localStorage` mock.
+- `src/systems/SaveSystem.ts`: unlock-order progression, XP→move-unlock thresholds, trophy reward rules (`recordTrophy`), loadout filtering, `viewMode` migration, and a save/load round-trip (incl. corrupt-blob fallback and legacy-roster grandfathering) against an in-memory `localStorage`.
+- `src/state/GameState.ts`: `pickRivals` variety + uniqueness, `startGp`/`gpAdvance`/`startTimeTrial`/`startBattle` state transitions.
+- `src/data/movesData.ts`: `unlockedCount`/`xpToNext` threshold math and `movePool` invariants (exactly four moves, no duplicates, an early defensive option for every species).
 
-Tooling: add **Vitest** (fast, ESM-native, TS-friendly, shares the Vite config). Target sub-second runs.
+Tooling: **Vitest** (fast, ESM-native, TS-friendly, shares the Vite config). Runs in under 1 s locally.
 
 ### D2. Data-integrity tests — cheap, high value
 
@@ -222,7 +224,6 @@ Once the sim is decoupled and seeded:
 ### D4. e2e hardening — keep, tighten
 
 - Add a build-output e2e (run against `vite preview` of the production build, not just dev) so the shipped bundle is exercised.
-- Keep `tests/diag.spec.ts` but move it out of the default `test` run (it is a manual screenshot tool, not an assertion).
 - Consider raising Playwright `workers` once tests are independent; today `fullyParallel: false` is a correctness crutch.
 
 ### Acceptance criteria (Workstream D)
@@ -233,11 +234,9 @@ Once the sim is decoupled and seeded:
 
 ## 9. Workstream E: Build and CI hygiene
 
-### E1. Fix the red build — HIGH, do immediately
+### E1. Fix the red build — DONE
 
-`Save.viewMode` returns `ViewSetting = "m7" | "rotate" | "north"` (`src/systems/SaveSystem.ts:6`,`:194`), but `ThreeView` dropped the `"north"` mode (`VIEW_CYCLE = ["m7", "rotate"]`, `src/systems/ThreeView.ts:19`). Passing it to the `ThreeView` constructor fails `tsc` (`src/scenes/RaceScene.ts:106`). The Playwright tests miss it because they run the dev server (esbuild transpile, no typecheck).
-
-Fix: drop `"north"` from `ViewSetting` and migrate any saved `"north"` to `"rotate"` on load (the load path at `:194-197` already sanitizes). Then `npm run build` is green.
+Previously `Save.viewMode` returned `ViewSetting = "m7" | "rotate" | "north"`, but `ThreeView` had dropped the `"north"` mode (`VIEW_CYCLE = ["m7", "rotate"]`, `src/systems/ThreeView.ts:19`), so passing it to the `ThreeView` constructor failed `tsc`. `ViewSetting` is now `"m7" | "rotate"` and the `viewMode` getter migrates any saved `"north"` to `"rotate"` on load (`src/systems/SaveSystem.ts:7`,`:197-201`). `tsc --noEmit` passes; the regression is covered by the `viewMode` migration unit tests in §8/D1.
 
 ### E2. CI gate — HIGH
 
@@ -257,9 +256,9 @@ Ordered so each phase ships value and de-risks the next.
 
 ### Phase 0 — Unblock (0.5–1 day)
 
-- E1 fix the red build.
+- E1 fix the red build. *(done — `tsc --noEmit` passes.)*
+- D1 set up Vitest and write the pure-logic unit tests. *(done — 9 test files, 75 cases.)*
 - E2 minimal CI gate (typecheck + build).
-- D1 set up Vitest and write the first `util.ts` / `Stats.ts` tests.
 - §11 perf harness scaffolding (FPS + `renderer.info` + sim-step timing readout).
 
 Exit: build green in CI, a handful of unit tests run, baseline perf numbers recorded.
@@ -310,8 +309,8 @@ Suggested target table (fill the "before" column from Phase 0):
 | Draw calls / frame (fixed scene) | TBD | ≥ 50% reduction |
 | Per-frame heap alloc (steady state) | TBD | ~0 |
 | Sim step ms (8 racers, headless) | TBD | < 2 ms |
-| Unit + data test runtime | n/a | < 5 s |
-| `npm run build` | red | green, CI-gated |
+| Unit + data test runtime | < 1 s | < 5 s |
+| `npm run build` | green (typecheck) | green, CI-gated |
 
 ## 12. Risks and open questions
 
