@@ -1,9 +1,12 @@
 # PokéKart — Kanto Grand Prix
 
-> **Note:** This is a learning project for the **Agentic Software
-> Development Lifecycle** — it exists primarily as a testbed for the Cursor /
-> long-running agent harness setup. The game is the workload; the real
-> point is exercising agentic SDLC workflows on a sizable, evolving codebase.
+> **Note:** This is a **Workday** project for stress-testing and
+> understanding the capabilities of new model releases for **Agent
+> Architectural development**. It's a learning vehicle for the Agentic
+> Software Development Lifecycle, used as a testbed for the Cursor /
+> long-running agent harness setup. The game is just the workload; the
+> real point is exercising agentic SDLC workflows — and probing what each
+> model release can do — on a sizable, evolving codebase.
 
 A Mario Kart-style browser racer starring the original 151 Pokémon. No karts:
 every Pokémon races with its own movement style — runners sprint, flyers hover
